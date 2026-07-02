@@ -1,0 +1,44 @@
+services:
+  nginx:
+    build:
+      context: nginx
+    ports:
+      - "9689:80"
+    depends_on:
+      - backend
+      - frontend
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: backend
+    env_file:
+      - .env
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+
+  db:
+    image: postgres:16-alpine
+    env_file:
+      - .env
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

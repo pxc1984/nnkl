@@ -1,0 +1,31 @@
+# Node
+node_modules/
+dist-ssr/
+*.local
+.eslintcache
+.stylelintcache
+.vite/
+.vercel/
+.next/
+
+# Environment variables
+.env
+deploy.env
+.env.local
+.env.*.local
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# DB
+*.sqlite
+*.db
+
+# bins
+*.exe
+backend/out.log
+

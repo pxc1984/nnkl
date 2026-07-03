@@ -4,80 +4,294 @@ info:
   description: Норникель База Знаний
   version: 1.0.0
 servers:
-  - url: 'https://nnkl.iamamaev.ru'
+- url: 'https://nnkl.iamamaev.ru'
 paths:
   /api/health:
     get:
       summary: Проверка доступности сервиса
       tags:
-        - System
+      - System
       responses:
-        200:
+        '200':
           description: Сервис работает
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/HealthResponse'
-# запрос на парсинг
-  /api/v1/data/ask:
-    post: # message -> md+katex ответ(в перспективе вебсокетами стриминг server -> client
-      summary: Задать вопрос к базе знаний
+  /api/v1/auth/register:
+    post:
+      summary: Создать аккаунт
       tags:
-        - Data
+      - Auth
       security:
-        - BearerAuth: []
+      - BearerAuth: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AskRequest'
+              $ref: '#/components/schemas/RegisterRequest'
       responses:
-        200:
-          description: Ответ на вопрос
+        '201':
+          description: Аккаунт создан
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AskResponse'
-        400:
+                $ref: '#/components/schemas/User'
+        '400':
           $ref: '#/components/responses/BadRequest'
-        401:
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '401':
           $ref: '#/components/responses/Unauthorized'
-  /api/v1/data:
-    get: # paginated listing
-      summary: Получить список загруженных объектов
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /api/v1/auth/email-verify:
+    post:
+      summary: Запросить или подтвердить email
       tags:
-        - Data
-      security:
-        - BearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/Page'
-        - $ref: '#/components/parameters/PageSize'
-        - in: query
-          name: query
-          schema:
-            type: string
-          description: Поисковая строка
-        - in: query
-          name: type
-          schema:
-            type: string
-          description: Фильтр по типу файла
+      - Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmailVerifyRequest'
       responses:
-        200:
-          description: Страница со списком объектов
+        '200':
+          description: Письмо отправлено или email подтвержден
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PaginatedKnowledgeObjectList'
-        401:
-          $ref: '#/components/responses/Unauthorized'
-    post: # multipart(data: pdf, md, txt, pptx, doc(x), xlsx, zip (рекурсивно по всем файлам), params: json) -> json([]uuid)
-      summary: Загрузить новые объекты в базу знаний
+                $ref: '#/components/schemas/EmailVerifyResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /api/v1/auth/login:
+    post:
+      summary: Войти в систему
       tags:
-        - Data
+      - Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Успешная аутентификация
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSession'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /api/v1/auth/refresh:
+    post:
+      summary: Обновить пару токенов
+      tags:
+      - Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+      responses:
+        '200':
+          description: Токены обновлены
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenPair'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/v1/auth/logout:
+    post:
+      summary: Выйти из текущей сессии (отозвать refresh токен)
+      tags:
+      - Auth
       security:
-        - BearerAuth: []
+      - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LogoutRequest'
+      responses:
+        '204':
+          description: Сессия завершена
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /api/v1/auth/logout-all:
+    post:
+      summary: Завершить все сессии пользователя
+      tags:
+      - Auth
+      security:
+      - BearerAuth: []
+      responses:
+        '204':
+          description: Все сессии завершены
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /api/v1/auth/forgot-password:
+    post:
+      summary: Запросить сброс пароля (отправка кода на email)
+      tags:
+      - Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForgotPasswordRequest'
+      responses:
+        '204':
+          description: Если email существует, письмо отправлено
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /api/v1/auth/reset-password:
+    post:
+      summary: Установить новый пароль по коду из письма
+      tags:
+      - Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetPasswordRequest'
+      responses:
+        '204':
+          description: Пароль изменен
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /api/v1/auth/sessions:
+    get:
+      summary: Получить список активных сессий пользователя
+      tags:
+      - Auth
+      security:
+      - BearerAuth: []
+      responses:
+        '200':
+          description: Список сессий
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SessionInfo'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /api/v1/auth/me:
+    get:
+      summary: Получить профиль текущего пользователя
+      tags:
+      - Auth
+      security:
+      - BearerAuth: []
+      responses:
+        '200':
+          description: Профиль пользователя
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /api/v1/users:
+    get:
+      summary: Получить список пользователей
+      tags:
+      - Users
+      security:
+      - BearerAuth: []
+      parameters:
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PageSize'
+      - in: query
+        name: query
+        schema:
+          type: string
+        description: Поиск по имени или email
+      responses:
+        '200':
+          description: Страница со списком пользователей
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedUserList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /api/v1/users/{id}:
+    get:
+      summary: Получить пользователя по идентификатору
+      tags:
+      - Users
+      security:
+      - BearerAuth: []
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: Данные пользователя
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+    patch:
+      summary: Обновить аватар пользователя
+      tags:
+      - Users
+      security:
+      - BearerAuth: []
+      parameters:
+      - $ref: '#/components/parameters/Id'
       requestBody:
         required: true
         content:
@@ -85,7 +299,103 @@ paths:
             schema:
               type: object
               required:
-                - data
+              - avatar
+              properties:
+                avatar:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Аватар обновлен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+    delete:
+      summary: Удалить пользователя
+      tags:
+      - Users
+      security:
+      - BearerAuth: []
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      responses:
+        '204':
+          description: Пользователь удален
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /api/v1/data:
+    get:
+      summary: Получить список загруженных объектов
+      tags:
+      - Data
+      security:
+      - BearerAuth: []
+      parameters:
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PageSize'
+      - in: query
+        name: query
+        schema:
+          type: string
+        description: Поисковая строка
+      - in: query
+        name: type
+        schema:
+          type: string
+        description: Фильтр по типу файла
+      - in: query
+        name: tags
+        schema:
+          type: array
+          items:
+            type: string
+        description: Фильтр по тегам
+      responses:
+        '200':
+          description: Страница со списком объектов
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedKnowledgeObjectList'
+        '204':
+          $ref: '#/components/responses/NoContent'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+    post:
+      summary: Загрузить новые объекты в базу знаний
+      tags:
+      - Data
+      security:
+      - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+              - data
               properties:
                 data:
                   type: array
@@ -98,44 +408,172 @@ paths:
               params:
                 contentType: application/json
       responses:
-        201:
+        '201':
           description: Объекты приняты в обработку
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/DataUploadResponse'
-        400:
+        '400':
           $ref: '#/components/responses/BadRequest'
-        401:
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /api/v1/data/search:
+    get:
+      summary: Полнотекстовый / гибридный поиск по чанкам
+      tags:
+      - Data
+      security:
+      - BearerAuth: []
+      parameters:
+      - in: query
+        name: q
+        required: true
+        schema:
+          type: string
+        description: Поисковый запрос
+      - in: query
+        name: dataIds
+        schema:
+          type: array
+          items:
+            type: string
+            format: uuid
+        description: Ограничить поиск объектами
+      - in: query
+        name: limit
+        schema:
+          type: integer
+          default: 10
+          maximum: 100
+        description: Лимит результатов
+      responses:
+        '200':
+          description: Результаты поиска
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /api/v1/tags:
+    get:
+      summary: Получить список тегов с частотой использования
+      tags:
+      - Data
+      security:
+      - BearerAuth: []
+      responses:
+        '200':
+          description: Список тегов
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TagList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /api/v1/data/bulk-delete:
+    post:
+      summary: Массовое удаление объектов
+      tags:
+      - Data
+      security:
+      - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkDeleteRequest'
+      responses:
+        '200':
+          description: Результат операции
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkOperationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /api/v1/data/bulk-tags:
+    patch:
+      summary: Массовое изменение тегов объектов
+      tags:
+      - Data
+      security:
+      - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkTagsRequest'
+      responses:
+        '200':
+          description: Результат операции
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkOperationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
   /api/v1/data/{id}:
-    get: # получить отпаршенное содержание объекта
+    get:
       summary: Получить данные объекта
       tags:
-        - Data
+      - Data
       security:
-        - BearerAuth: []
+      - BearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/Id'
+      - $ref: '#/components/parameters/Id'
       responses:
-        200:
+        '200':
           description: Данные объекта
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/KnowledgeObjectDetails'
-        401:
-          $ref: '#/components/responses/Unauthorized'
-        404:
+        '404':
           $ref: '#/components/responses/NotFound'
-    patch: # изменить конкретный объект (заново multipart с обновленной версией)
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+    patch:
       summary: Обновить объект
       tags:
-        - Data
+      - Data
       security:
-        - BearerAuth: []
+      - BearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/Id'
+      - $ref: '#/components/parameters/Id'
       requestBody:
         required: true
         content:
@@ -154,241 +592,259 @@ paths:
               params:
                 contentType: application/json
       responses:
-        200:
+        '200':
           description: Объект обновлен
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/KnowledgeObject'
-        400:
+        '400':
           $ref: '#/components/responses/BadRequest'
-        401:
-          $ref: '#/components/responses/Unauthorized'
-        404:
+        '404':
           $ref: '#/components/responses/NotFound'
-    delete: # ...
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+    delete:
       summary: Удалить объект
       tags:
-        - Data
+      - Data
       security:
-        - BearerAuth: []
+      - BearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/Id'
+      - $ref: '#/components/parameters/Id'
       responses:
-        204:
+        '204':
           description: Объект удален
-        401:
-          $ref: '#/components/responses/Unauthorized'
-        404:
+        '404':
           $ref: '#/components/responses/NotFound'
-# регистрация/вход/проверка регистрации
-  /api/v1/auth/register:
-    post: # Auth protected админ создает аккаунт
-      summary: Создать аккаунт
-      tags:
-        - Auth
-      security:
-        - BearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/RegisterRequest'
-      responses:
-        201:
-          description: Аккаунт создан
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/User'
-        400:
-          $ref: '#/components/responses/BadRequest'
-        401:
+        '401':
           $ref: '#/components/responses/Unauthorized'
-        403:
+        '403':
           $ref: '#/components/responses/Forbidden'
-  /api/v1/auth/email-verify:
-    post: # запросить емэйл подтверждение (поле email:) или если есть поле code: отправить код подтверждения
-      summary: Запросить или подтвердить email
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /api/v1/data/{id}/download:
+    get:
+      summary: Скачать оригинальный файл объекта
       tags:
-        - Auth
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/EmailVerifyRequest'
+      - Data
+      security:
+      - BearerAuth: []
+      parameters:
+      - $ref: '#/components/parameters/Id'
       responses:
-        200:
-          description: Письмо отправлено или email подтвержден
+        '200':
+          description: Файл
           content:
-            application/json:
+            application/octet-stream:
               schema:
-                $ref: '#/components/schemas/EmailVerifyResponse'
-        400:
-          $ref: '#/components/responses/BadRequest'
-  /api/v1/auth/login:
+                type: string
+                format: binary
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+              description: attachment; filename="..."
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /api/v1/data/{id}/reprocess:
     post:
-      summary: Войти в систему
+      summary: Перезапустить парсинг и индексацию объекта
       tags:
-        - Auth
+      - Data
+      security:
+      - BearerAuth: []
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      responses:
+        '202':
+          description: Объект поставлен в очередь на переработку
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KnowledgeObject'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /api/v1/data/ask:
+    post:
+      summary: Задать вопрос к базе знаний
+      tags:
+      - Data
+      security:
+      - BearerAuth: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/LoginRequest'
+              $ref: '#/components/schemas/AskRequest'
       responses:
-        200:
-          description: Успешная аутентификация
+        '200':
+          description: Ответ на вопрос
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AuthSession'
-        400:
+                $ref: '#/components/schemas/AskResponse'
+        '400':
           $ref: '#/components/responses/BadRequest'
-        401:
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '401':
           $ref: '#/components/responses/Unauthorized'
-  /api/v1/auth/refresh:
-    post: # refresh1 -> (refresh2 access2)
-      summary: Обновить пару токенов
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /api/v1/ask/sessions:
+    get:
+      summary: Получить историю чат-сессий пользователя
       tags:
-        - Auth
+      - Ask
+      security:
+      - BearerAuth: []
+      parameters:
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Список сессий
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedChatSessionList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+    post:
+      summary: Создать новую чат-сессию
+      tags:
+      - Ask
+      security:
+      - BearerAuth: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/RefreshRequest'
+              $ref: '#/components/schemas/ChatSessionCreateRequest'
       responses:
-        200:
-          description: Токены обновлены
+        '201':
+          description: Сессия создана
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TokenPair'
-        400:
+                $ref: '#/components/schemas/ChatSession'
+        '400':
           $ref: '#/components/responses/BadRequest'
-        401:
+        '401':
           $ref: '#/components/responses/Unauthorized'
-  /api/v1/auth/me:
-    get: # 401|200 (profile)
-      summary: Получить профиль текущего пользователя
-      tags:
-        - Auth
-      security:
-        - BearerAuth: []
-      responses:
-        200:
-          description: Профиль пользователя
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/UserProfile'
-        401:
-          $ref: '#/components/responses/Unauthorized'
-# пользователи
-  /api/v1/users:
-    get: # paginated listing
-      summary: Получить список пользователей
-      tags:
-        - Users
-      security:
-        - BearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/Page'
-        - $ref: '#/components/parameters/PageSize'
-        - in: query
-          name: query
-          schema:
-            type: string
-          description: Поиск по имени или email
-      responses:
-        200:
-          description: Страница со списком пользователей
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PaginatedUserList'
-        401:
-          $ref: '#/components/responses/Unauthorized'
-        403:
+        '403':
           $ref: '#/components/responses/Forbidden'
-  /api/v1/users/{id}:
-    get: # получить данные о пользователе (если есть права)
-      summary: Получить пользователя по идентификатору
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /api/v1/ask/sessions/{id}:
+    get:
+      summary: Получить сессию с сообщениями
       tags:
-        - Users
+      - Ask
       security:
-        - BearerAuth: []
+      - BearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/Id'
+      - $ref: '#/components/parameters/Id'
       responses:
-        200:
-          description: Данные пользователя
+        '200':
+          description: Сессия с сообщениями
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserProfile'
-        401:
-          $ref: '#/components/responses/Unauthorized'
-        403:
-          $ref: '#/components/responses/Forbidden'
-        404:
+                $ref: '#/components/schemas/ChatSessionDetails'
+        '404':
           $ref: '#/components/responses/NotFound'
-    patch: # поменять аватарку (multipart -> json)
-      summary: Обновить аватар пользователя
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /api/v1/ask/sessions/{id}/messages:
+    post:
+      summary: Отправить сообщение в рамках сессии
       tags:
-        - Users
+      - Ask
       security:
-        - BearerAuth: []
+      - BearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/Id'
+      - $ref: '#/components/parameters/Id'
       requestBody:
         required: true
         content:
-          multipart/form-data:
+          application/json:
             schema:
-              type: object
-              required:
-                - avatar
-              properties:
-                avatar:
-                  type: string
-                  format: binary
+              $ref: '#/components/schemas/ChatMessageRequest'
       responses:
-        200:
-          description: Аватар обновлен
+        '200':
+          description: Ответ ассистента
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserProfile'
-        400:
+                $ref: '#/components/schemas/AskResponse'
+        '400':
           $ref: '#/components/responses/BadRequest'
-        401:
-          $ref: '#/components/responses/Unauthorized'
-        403:
-          $ref: '#/components/responses/Forbidden'
-        404:
+        '404':
           $ref: '#/components/responses/NotFound'
-    delete: #удалить пользователя
-      summary: Удалить пользователя
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /api/v1/ask/feedback:
+    post:
+      summary: Оставить feedback на ответ ассистента
       tags:
-        - Users
+      - Ask
       security:
-        - BearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/Id'
+      - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeedbackRequest'
       responses:
-        204:
-          description: Пользователь удален
-        401:
+        '204':
+          description: Feedback принят
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
           $ref: '#/components/responses/Unauthorized'
-        403:
+        '403':
           $ref: '#/components/responses/Forbidden'
-        404:
-          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
 components:
   securitySchemes:
     BearerAuth:
@@ -421,6 +877,22 @@ components:
         maximum: 100
         default: 20
       description: Размер страницы
+    XRequestId:
+      in: header
+      name: X-Request-ID
+      required: false
+      schema:
+        type: string
+        format: uuid
+      description: Идентификатор запроса для трейсинга
+    AcceptLanguage:
+      in: header
+      name: Accept-Language
+      required: false
+      schema:
+        type: string
+        default: ru-RU
+      description: Предпочтительный язык ответа (LLM / ошибки)
   responses:
     BadRequest:
       description: Некорректный запрос
@@ -446,11 +918,62 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
+    NoContent:
+      description: Нет данных
+    Conflict:
+      description: Конфликт (ресурс уже существует)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    TooManyRequests:
+      description: Превышен лимит запросов
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+          description: Секунд до сброса лимита
+        X-RateLimit-Limit:
+          schema:
+            type: integer
+          description: Лимит запросов
+        X-RateLimit-Remaining:
+          schema:
+            type: integer
+          description: Оставшихся запросов
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    UnprocessableEntity:
+      description: Ошибка валидации полей
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    PayloadTooLarge:
+      description: Размер запроса превышает лимит
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    UnsupportedMediaType:
+      description: Неподдерживаемый формат файла
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    ServiceUnavailable:
+      description: ML-сервис или очередь недоступны
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
   schemas:
     HealthResponse:
       type: object
       required:
-        - status
+      - status
       properties:
         status:
           type: string
@@ -458,7 +981,7 @@ components:
     AskRequest:
       type: object
       required:
-        - message
+      - message
       properties:
         message:
           type: string
@@ -469,10 +992,25 @@ components:
           items:
             type: string
             format: uuid
+        sessionId:
+          type: string
+          format: uuid
+          description: ID чат-сессии (опционально)
+        temperature:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 2
+          default: 0.7
+          description: Температура генерации LLM
+        stream:
+          type: boolean
+          default: false
+          description: Запросить стриминг ответа (HTTP SSE)
     AskResponse:
       type: object
       required:
-        - answer
+      - answer
       properties:
         answer:
           type: string
@@ -484,8 +1022,8 @@ components:
     Citation:
       type: object
       required:
-        - id
-        - title
+      - id
+      - title
       properties:
         id:
           type: string
@@ -500,10 +1038,10 @@ components:
     KnowledgeObject:
       type: object
       required:
-        - id
-        - filename
-        - status
-        - createdAt
+      - id
+      - filename
+      - status
+      - createdAt
       properties:
         id:
           type: string
@@ -520,10 +1058,14 @@ components:
         status:
           type: string
           enum:
-            - pending
-            - processing
-            - ready
-            - failed
+          - pending
+          - processing
+          - ready
+          - failed
+        errorMessage:
+          type: string
+          nullable: true
+          description: Причина ошибки парсинга (если status=failed)
         createdAt:
           type: string
           format: date-time
@@ -534,24 +1076,24 @@ components:
           $ref: '#/components/schemas/UserShort'
     KnowledgeObjectDetails:
       allOf:
-        - $ref: '#/components/schemas/KnowledgeObject'
-        - type: object
-          properties:
-            content:
-              type: string
-              description: Отпарсенное текстовое содержимое
-            metadata:
-              type: object
-              additionalProperties: true
-            chunks:
-              type: array
-              items:
-                $ref: '#/components/schemas/KnowledgeChunk'
+      - $ref: '#/components/schemas/KnowledgeObject'
+      - type: object
+        properties:
+          content:
+            type: string
+            description: Отпарсенное текстовое содержимое
+          metadata:
+            type: object
+            additionalProperties: true
+          chunks:
+            type: array
+            items:
+              $ref: '#/components/schemas/KnowledgeChunk'
     KnowledgeChunk:
       type: object
       required:
-        - index
-        - text
+      - index
+      - text
       properties:
         index:
           type: integer
@@ -572,6 +1114,14 @@ components:
           type: boolean
           default: true
           description: Актуально для zip-архивов
+        extractImages:
+          type: boolean
+          default: false
+          description: Извлекать изображения из PDF/DOCX для дальнейшего анализа
+        ocrLanguage:
+          type: string
+          default: rus
+          description: Язык OCR для сканированных документов
     DataUpdateParams:
       type: object
       properties:
@@ -584,7 +1134,7 @@ components:
     DataUploadResponse:
       type: object
       required:
-        - ids
+      - ids
       properties:
         ids:
           type: array
@@ -594,7 +1144,7 @@ components:
     RegisterRequest:
       type: object
       required:
-        - email
+      - email
       properties:
         email:
           type: string
@@ -604,8 +1154,8 @@ components:
         role:
           type: string
           enum:
-            - admin
-            - user
+          - admin
+          - user
     EmailVerifyRequest:
       type: object
       description: Передайте `email`, чтобы отправить письмо, либо `code`, чтобы подтвердить email.
@@ -619,18 +1169,18 @@ components:
     EmailVerifyResponse:
       type: object
       required:
-        - status
+      - status
       properties:
         status:
           type: string
           enum:
-            - sent
-            - verified
+          - sent
+          - verified
     LoginRequest:
       type: object
       required:
-        - email
-        - password
+      - email
+      - password
       properties:
         email:
           type: string
@@ -641,34 +1191,39 @@ components:
     RefreshRequest:
       type: object
       required:
-        - refreshToken
+      - refreshToken
       properties:
         refreshToken:
           type: string
     TokenPair:
       type: object
       required:
-        - accessToken
-        - refreshToken
+      - accessToken
+      - refreshToken
+      - expiresAt
       properties:
         accessToken:
           type: string
         refreshToken:
           type: string
+        expiresAt:
+          type: string
+          format: date-time
+          description: UTC время истечения accessToken
     AuthSession:
       allOf:
-        - $ref: '#/components/schemas/TokenPair'
-        - type: object
-          required:
-            - user
-          properties:
-            user:
-              $ref: '#/components/schemas/UserProfile'
+      - $ref: '#/components/schemas/TokenPair'
+      - type: object
+        required:
+        - user
+        properties:
+          user:
+            $ref: '#/components/schemas/UserProfile'
     UserShort:
       type: object
       required:
-        - id
-        - email
+      - id
+      - email
       properties:
         id:
           type: string
@@ -680,36 +1235,45 @@ components:
           type: string
     User:
       allOf:
-        - $ref: '#/components/schemas/UserShort'
-        - type: object
-          required:
-            - createdAt
-          properties:
-            role:
-              type: string
-              enum:
-                - admin
-                - user
-            emailVerified:
-              type: boolean
-            createdAt:
-              type: string
-              format: date-time
+      - $ref: '#/components/schemas/UserShort'
+      - type: object
+        required:
+        - createdAt
+        properties:
+          role:
+            type: string
+            enum:
+            - admin
+            - user
+          emailVerified:
+            type: boolean
+          createdAt:
+            type: string
+            format: date-time
     UserProfile:
       allOf:
-        - $ref: '#/components/schemas/User'
-        - type: object
-          properties:
-            avatarUrl:
-              type: string
-              format: uri
-              nullable: true
+      - $ref: '#/components/schemas/User'
+      - type: object
+        properties:
+          avatarUrl:
+            type: string
+            format: uri
+            nullable: true
+          lastLoginAt:
+            type: string
+            format: date-time
+            nullable: true
+            description: Время последнего входа
+          updatedAt:
+            type: string
+            format: date-time
+            description: Время последнего обновления профиля
     PaginationMeta:
       type: object
       required:
-        - page
-        - pageSize
-        - total
+      - page
+      - pageSize
+      - total
       properties:
         page:
           type: integer
@@ -722,8 +1286,8 @@ components:
     PaginatedKnowledgeObjectList:
       type: object
       required:
-        - items
-        - meta
+      - items
+      - meta
       properties:
         items:
           type: array
@@ -734,8 +1298,8 @@ components:
     PaginatedUserList:
       type: object
       required:
-        - items
-        - meta
+      - items
+      - meta
       properties:
         items:
           type: array
@@ -746,7 +1310,7 @@ components:
     ErrorResponse:
       type: object
       required:
-        - message
+      - message
       properties:
         message:
           type: string
@@ -755,3 +1319,333 @@ components:
         details:
           type: object
           additionalProperties: true
+    LogoutRequest:
+      type: object
+      properties:
+        refreshToken:
+          type: string
+          description: Токен для отзыва (опционально — если не передан, отзывается текущий)
+    ForgotPasswordRequest:
+      type: object
+      required:
+      - email
+      properties:
+        email:
+          type: string
+          format: email
+    ResetPasswordRequest:
+      type: object
+      required:
+      - email
+      - code
+      - newPassword
+      properties:
+        email:
+          type: string
+          format: email
+        code:
+          type: string
+          description: Код из письма
+        newPassword:
+          type: string
+          format: password
+          minLength: 8
+    SessionInfo:
+      type: object
+      required:
+      - id
+      - ip
+      - userAgent
+      - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        ip:
+          type: string
+        userAgent:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        lastUsedAt:
+          type: string
+          format: date-time
+    SearchResponse:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SearchResultItem'
+    SearchResultItem:
+      type: object
+      required:
+      - chunk
+      - score
+      - object
+      properties:
+        chunk:
+          $ref: '#/components/schemas/KnowledgeChunk'
+        score:
+          type: number
+          format: float
+        object:
+          $ref: '#/components/schemas/KnowledgeObject'
+    TagList:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Tag'
+    Tag:
+      type: object
+      required:
+      - name
+      - count
+      properties:
+        name:
+          type: string
+        count:
+          type: integer
+          description: Количество объектов с тегом
+    BulkDeleteRequest:
+      type: object
+      required:
+      - ids
+      properties:
+        ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+    BulkTagsRequest:
+      type: object
+      required:
+      - ids
+      - tags
+      - operation
+      properties:
+        ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        tags:
+          type: array
+          items:
+            type: string
+        operation:
+          type: string
+          enum:
+          - add
+          - remove
+          - set
+          description: add — добавить, remove — удалить, set — заменить
+    BulkOperationResponse:
+      type: object
+      required:
+      - processed
+      - failed
+      properties:
+        processed:
+          type: integer
+        failed:
+          type: integer
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+              message:
+                type: string
+    ChatSession:
+      type: object
+      required:
+      - id
+      - title
+      - createdAt
+      - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    ChatSessionDetails:
+      allOf:
+      - $ref: '#/components/schemas/ChatSession'
+      - type: object
+        properties:
+          messages:
+            type: array
+            items:
+              $ref: '#/components/schemas/ChatMessage'
+    ChatSessionCreateRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          description: Название сессии (auto-generated если не передано)
+    PaginatedChatSessionList:
+      type: object
+      required:
+      - items
+      - meta
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChatSession'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+    ChatMessage:
+      type: object
+      required:
+      - id
+      - role
+      - content
+      - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        role:
+          type: string
+          enum:
+          - user
+          - assistant
+        content:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+    ChatMessageRequest:
+      type: object
+      required:
+      - message
+      properties:
+        message:
+          type: string
+        dataIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        temperature:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 2
+          default: 0.7
+    FeedbackRequest:
+      type: object
+      required:
+      - rating
+      properties:
+        sessionId:
+          type: string
+          format: uuid
+          description: ID чат-сессии
+        messageId:
+          type: string
+          format: uuid
+          description: ID сообщения ассистента (опционально)
+        rating:
+          type: string
+          enum:
+          - up
+          - down
+          description: up — полезно, down — неполезно
+        comment:
+          type: string
+          description: Дополнительный комментарий
+
+# ============================================
+# 🟢 Желательные доработки (Observability & Admin)
+# ============================================
+# Рекомендуется добавить в следующих итерациях:
+#
+# 1. GET /api/health/live
+#    Kubernetes liveness probe. Возвращает 200 если процесс запущен.
+#
+# 2. GET /api/health/ready
+#    Kubernetes readiness probe. Возвращает 200 только если БД, очередь и
+#    ML-модели (embeddings + LLM) доступны. Иначе 503.
+#
+# 3. GET /api/v1/admin/stats
+#    Админ-эндпоинт: количество документов, токенов, пользователей,
+#    среднее время индексации, размер векторного хранилища.
+#    Требует роль admin.
+#
+# 4. GET /api/v1/admin/audit-log
+#    Пагинированный лог действий: кто загрузил / удалил / обновил документ,
+#    кто создал пользователя, с какого IP. Требует роль admin.
+#
+# 5. GET /api/v1/ask/usage
+#    Квоты и потребление LLM для текущего пользователя:
+#    { usedTokens, maxTokens, usedRequests, maxRequests, resetDate }.
+#
+# 6. WebSocket стриминг (в перспективе)
+#    wss://nnkl.iamamaev.ru/api/v1/ask/stream
+#    Протокол: JSON-фреймы. Клиент отправляет { sessionId, message }.
+#    Сервер стримит чанки ответа: { type: "chunk", content: "..." }
+#    Завершение: { type: "done", citations: [...] }
+#    Ошибка: { type: "error", message: "..." }
+#
+# ============================================
+# 🔵 Модельные правки (Schema refinements)
+# ============================================
+#
+# 1. KnowledgeObjectDetails.content
+#    Для больших документов (>100KB чистого текста) рекомендуется
+#    поддержать ?format=raw|preview. Preview возвращает первые N символов
+#    или оглавление, чтобы не тащить мегабайты в JSON.
+#
+# 2. UserProfile
+#    Добавлены lastLoginAt и updatedAt. Рекомендуется также добавить
+#    { department, position } если интеграция с корпоративным LDAP/AD.
+#
+# 3. DataUploadParams
+#    Добавлены extractImages (для multimodal RAG в будущем) и ocrLanguage.
+#    Рассмотреть добавление: splitStrategy (recursive|semantic|fixed),
+#    chunkSize, chunkOverlap — для тонкой настройки chunking'а.
+#
+# 4. AskRequest
+#    Добавлены temperature и stream (boolean). Рассмотреть:
+#    - model: string (выбор модели, если поддерживается несколько)
+#    - maxTokens: integer (ограничение длины ответа)
+#    - responseFormat: "markdown" | "json" (для структурированного вывода)
+#
+# 5. Глобальные заголовки
+#    Все эндпоинты (кроме публичных /health, /login, /register)
+#    должны поддерживать:
+#    - X-Request-ID (tracing)
+#    - Accept-Language (i18n ответов LLM и ошибок)
+#
+# 6. Rate Limiting
+#    Рекомендуется реализовать на уровне middleware:
+#    - /auth/*: 5 req/min per IP
+#    - /ask: 20 req/min per user
+#    - /data (POST): 10 req/min per user
+#    Заголовки ответа: X-RateLimit-Limit, X-RateLimit-Remaining,
+#    X-RateLimit-Reset, Retry-After (при 429).
+#
+# 7. ETag / If-None-Match
+#    Для GET /api/v1/data/{id} и GET /api/v1/users/{id}
+#    добавить ETag на основе updatedAt. Снижает нагрузку при повторных
+#    запросах одного и того же документа.

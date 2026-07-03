@@ -79,6 +79,6 @@ OCR is started from the root `docker-compose.yml` and uses the shared root `.env
 
 ```bash
 cd ocr
-pip install -r requirements.txt
+uv sync --group dev
 pytest tests -v
 ```

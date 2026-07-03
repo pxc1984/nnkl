@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/pxc1984/backend-rest-go/utils"
+	"github.com/pxc1984/nnkl-backend/utils"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )

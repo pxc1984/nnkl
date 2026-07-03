@@ -1,4 +1,4 @@
-module github.com/pxc1984/backend-rest-go
+module github.com/pxc1984/nnkl-backend
 
 go 1.26.0
 

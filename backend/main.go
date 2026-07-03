@@ -14,9 +14,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
-	"github.com/pxc1984/backend-rest-go/api"
-	store2 "github.com/pxc1984/backend-rest-go/store"
-	"github.com/pxc1984/backend-rest-go/utils"
+	"github.com/pxc1984/nnkl-backend/api"
+	store2 "github.com/pxc1984/nnkl-backend/store"
+	"github.com/pxc1984/nnkl-backend/utils"
 )
 
 func main() {

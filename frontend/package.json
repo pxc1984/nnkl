@@ -13,7 +13,6 @@
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.2.9",
-    "@lucide/svelte": "^1.0.1",
     "axios": "^1.11.0",
     "clsx": "^2.1.1",
     "ogl": "^1.0.11",
@@ -24,6 +23,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@internationalized/date": "^3.12.2",
+    "@lucide/svelte": "^0.577.0",
     "@sveltejs/adapter-auto": "^6.1.0",
     "@sveltejs/kit": "^2.48.5",
     "@tailwindcss/vite": "^4.3.0",

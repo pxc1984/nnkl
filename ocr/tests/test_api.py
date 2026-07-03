@@ -23,6 +23,25 @@ def _insert_blob(db_session, sample_pdf: Path, blob_id: str = "blob-1") -> Input
     return blob
 
 
+def _insert_blob_bytes(
+    db_session,
+    *,
+    blob_id: str,
+    filename: str,
+    content_type: str,
+    content: bytes,
+) -> InputBlob:
+    blob = InputBlob(
+        id=blob_id,
+        filename=filename,
+        content_type=content_type,
+        content=content,
+    )
+    db_session.add(blob)
+    db_session.commit()
+    return blob
+
+
 class TestHealthEndpoint:
     def test_health_returns_response(self, client: TestClient) -> None:
         response = client.get("/api/v1/health")
@@ -103,3 +122,59 @@ class TestStatusAndResultEndpoints:
         assert data["content_type"] == "text/markdown"
         assert data["content_text"] == "# markdown"
         assert data["has_assets_zip"] is False
+
+
+class TestNativeOfficeExtraction:
+    def test_parse_docx_uses_native_extraction(self, client: TestClient, db_session, sample_docx_bytes: bytes) -> None:
+        _insert_blob_bytes(
+            db_session,
+            blob_id="blob-docx",
+            filename="sample.docx",
+            content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            content=sample_docx_bytes,
+        )
+
+        response = client.post(
+            "/api/v1/parse",
+            json={
+                "document_id": "doc-docx",
+                "input_blob_id": "blob-docx",
+                "output_format": "markdown",
+                "language": "auto",
+            },
+        )
+
+        assert response.status_code == 201
+        result_response = client.get("/api/v1/result/doc-docx")
+        assert result_response.status_code == 200
+        content = result_response.json()["content_text"]
+        assert "DOCX title" in content
+        assert "DOCX body text" in content
+        assert "Cell A | Cell B" in content
+
+    def test_parse_pptx_uses_native_extraction(self, client: TestClient, db_session, sample_pptx_bytes: bytes) -> None:
+        _insert_blob_bytes(
+            db_session,
+            blob_id="blob-pptx",
+            filename="slides.pptx",
+            content_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            content=sample_pptx_bytes,
+        )
+
+        response = client.post(
+            "/api/v1/parse",
+            json={
+                "document_id": "doc-pptx",
+                "input_blob_id": "blob-pptx",
+                "output_format": "markdown",
+                "language": "auto",
+            },
+        )
+
+        assert response.status_code == 201
+        result_response = client.get("/api/v1/result/doc-pptx")
+        assert result_response.status_code == 200
+        content = result_response.json()["content_text"]
+        assert "Slide 1" in content
+        assert "PPTX title" in content
+        assert "PPTX bullet" in content

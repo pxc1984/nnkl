@@ -1,12 +1,12 @@
 # PDF OCR Service
 
-FastAPI OCR microservice for synchronous parsing of PDFs already uploaded by a gateway into shared Postgres storage.
+FastAPI parsing microservice for synchronous processing of `pdf`, `docx`, and `pptx` files already uploaded by a gateway into shared Postgres storage.
 
 ## Flow
 
-1. Gateway stores PDF bytes in shared Postgres table `input_blobs`.
+1. Gateway stores document bytes in shared Postgres table `input_blobs`.
 2. Gateway sends `POST /api/v1/parse` with `document_id`, `input_blob_id`, `output_format`, `language`.
-3. OCR service reads the blob from Postgres, parses it through Docling, stores output in Postgres tables `parse_jobs` and `parse_results`, and returns `201 Created`.
+3. OCR service reads the blob from Postgres, parses `pdf` through Docling and extracts `docx` / `pptx` text natively, stores output in Postgres tables `parse_jobs` and `parse_results`, and returns `201 Created`.
 4. Gateway can read status and result through OCR API or directly from the shared database.
 
 ## API

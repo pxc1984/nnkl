@@ -15,6 +15,7 @@ from app.api.schemas import ParseRequest, TaskStatus
 from app.config import Settings
 from app.db.models import InputBlob, ParseJob, ParseResult
 from app.services.ocr_service import get_ocr_service
+from app.use_cases.document_extractor import extract_native_document_text
 
 
 class InputBlobNotFoundError(Exception):
@@ -59,17 +60,13 @@ def parse_document(
         output_dir = work_dir / "result"
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        ocr_service = get_ocr_service(
-            artifacts_path=settings.docling_artifacts_path,
-            use_gpu=settings.docling_use_gpu,
-            do_formula_enrichment=settings.docling_do_formula_enrichment,
-        )
-        content, image_dir = ocr_service.convert(
+        content, image_dir = _parse_input_document(
             input_path,
             output_format=request.output_format.value,
             language=request.language.value,
             correlation_id=correlation_id,
             results_dir=output_dir,
+            settings=settings,
         )
 
         result = job.result
@@ -102,9 +99,36 @@ def parse_document(
 
 def _resolve_filename(filename: str) -> str:
     candidate = Path(filename).name or "document.pdf"
-    if candidate.lower().endswith(".pdf"):
+    if Path(candidate).suffix.lower() in {".pdf", ".docx", ".pptx"}:
         return candidate
     return f"{candidate}.pdf"
+
+
+def _parse_input_document(
+    input_path: Path,
+    *,
+    output_format: str,
+    language: str,
+    correlation_id: str | None,
+    results_dir: Path,
+    settings: Settings,
+) -> tuple[str, Path | None]:
+    if input_path.suffix.lower() == ".pdf":
+        ocr_service = get_ocr_service(
+            artifacts_path=settings.docling_artifacts_path,
+            use_gpu=settings.docling_use_gpu,
+            do_formula_enrichment=settings.docling_do_formula_enrichment,
+        )
+        return ocr_service.convert(
+            input_path,
+            output_format=output_format,
+            language=language,
+            correlation_id=correlation_id,
+            results_dir=results_dir,
+        )
+
+    content = extract_native_document_text(input_path, output_format=output_format)
+    return content, None
 
 
 def _resolve_content_type(output_format: str) -> str:

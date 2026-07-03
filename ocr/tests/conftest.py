@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import sys
 from collections.abc import Generator
+from io import BytesIO
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -82,6 +83,36 @@ def sample_pdf() -> Path:
     doc.save(pdf_path)
     doc.close()
     return pdf_path
+
+
+@pytest.fixture
+def sample_docx_bytes() -> bytes:
+    from docx import Document
+
+    document = Document()
+    document.add_paragraph("DOCX title")
+    document.add_paragraph("DOCX body text")
+    table = document.add_table(rows=1, cols=2)
+    table.rows[0].cells[0].text = "Cell A"
+    table.rows[0].cells[1].text = "Cell B"
+
+    buffer = BytesIO()
+    document.save(buffer)
+    return buffer.getvalue()
+
+
+@pytest.fixture
+def sample_pptx_bytes() -> bytes:
+    from pptx import Presentation
+
+    presentation = Presentation()
+    slide = presentation.slides.add_slide(presentation.slide_layouts[1])
+    slide.shapes.title.text = "PPTX title"
+    slide.placeholders[1].text = "PPTX bullet"
+
+    buffer = BytesIO()
+    presentation.save(buffer)
+    return buffer.getvalue()
 
 
 @pytest.fixture

@@ -4,7 +4,7 @@ info:
   description: Норникель База Знаний
   version: 1.0.0
 servers:
-- url: 'https://nnkl.iamamaev.ru'
+- url: 'https://nnkl.iamamaev.online'
 paths:
   /api/health:
     get:

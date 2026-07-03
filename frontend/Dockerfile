@@ -17,10 +17,13 @@ WORKDIR /app
 RUN corepack enable
 
 COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile --prod=false
+RUN pnpm install --frozen-lockfile --prod
 
-COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/build ./build
+
+ENV HOST=0.0.0.0
+ENV PORT=5173
 
 EXPOSE 5173
 
-CMD ["pnpm", "exec", "vite", "preview", "--host", "0.0.0.0", "--port", "5173"]
+CMD ["node", "build/index.js"]

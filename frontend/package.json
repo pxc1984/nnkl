@@ -6,7 +6,6 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "lint": "eslint .",
     "preview": "vite preview",
     "format": "prettier --write .",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json && tsc -p tsconfig.node.json && prettier --check ."
@@ -24,7 +23,7 @@
     "@eslint/js": "^10.0.1",
     "@internationalized/date": "^3.12.2",
     "@lucide/svelte": "^0.577.0",
-    "@sveltejs/adapter-auto": "^6.1.0",
+    "@sveltejs/adapter-node": "^5.3.3",
     "@sveltejs/kit": "^2.48.5",
     "@tailwindcss/vite": "^4.3.0",
     "@tsconfig/svelte": "^5.0.8",

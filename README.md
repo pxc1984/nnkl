@@ -61,16 +61,18 @@ PORT=8080
 LOG_LEVEL=INFO
 GIN_MODE=release
 STORE_BACKEND=memory
+AUTH_SECRET=change-me-in-production
+ACCESS_TOKEN_TTL=15m
+REFRESH_TOKEN_TTL=720h
 ```
 
 виды бекенд сторов:
 
-- `STORE_BACKEND=memory`
 - `STORE_BACKEND=postgres`
+- `STORE_BACKEND=memory`
 
 опционально для фронтенда `frontend/.env`:
 
 ```env
 API_URL=
 ```
-

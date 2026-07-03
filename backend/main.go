@@ -15,6 +15,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	"github.com/pxc1984/nnkl-backend/api"
+	apiv1 "github.com/pxc1984/nnkl-backend/api/v1"
 	store2 "github.com/pxc1984/nnkl-backend/store"
 	"github.com/pxc1984/nnkl-backend/utils"
 )
@@ -38,7 +39,7 @@ func main() {
 
 	router := gin.Default()
 
-	_ = router.Group("/api/v1") // inject here
+	apiv1.RegisterRoutes(router.Group("/api/v1"))
 
 	router.GET("/api/health", api.HealthCheck)
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/pxc1984/nnkl-backend/utils"
 )
@@ -12,6 +13,20 @@ type Store interface {
 	Backend() string
 	Ping(context.Context) error
 	Close() error
+	CountUsers(context.Context) (int64, error)
+	CreateUser(context.Context, CreateUserParams) (*User, error)
+	GetUserByEmail(context.Context, string) (*User, error)
+	GetUserByID(context.Context, string) (*User, error)
+	UpdateUserLastLogin(context.Context, string, time.Time) error
+	CreateSession(context.Context, CreateSessionParams) (*Session, error)
+	GetSessionByID(context.Context, string) (*Session, error)
+	GetSessionByRefreshTokenHash(context.Context, string) (*Session, error)
+	UpdateSessionToken(context.Context, UpdateSessionTokenParams) (*Session, error)
+	TouchSession(context.Context, string, time.Time) error
+	ListUserSessions(context.Context, string) ([]Session, error)
+	DeleteSessionByID(context.Context, string) error
+	DeleteSessionByUserAndHash(context.Context, string, string) error
+	DeleteUserSessions(context.Context, string) error
 }
 
 var globalStore Store

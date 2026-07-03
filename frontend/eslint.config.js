@@ -23,6 +23,6 @@ export default tseslint.config(
     },
   },
   {
-    ignores: ["dist/**", "node_modules/**"],
+    ignores: [".svelte-kit/**", "dist/**", "node_modules/**"],
   },
 );

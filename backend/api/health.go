@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/pxc1984/backend-rest-go/store"
+	"github.com/pxc1984/nnkl-backend/store"
 )
 
 func HealthCheck(ctx *gin.Context) {

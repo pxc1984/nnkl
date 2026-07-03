@@ -13,6 +13,7 @@
       </ENTRIES>
     </EXTENSION>
     <kind value="DIRECTORY" />
+    <package value="github.com/pxc1984/backend-rest-go" />
     <directory value="$PROJECT_DIR$/backend" />
     <filePath value="$PROJECT_DIR$/backend/main.go" />
     <method v="2" />

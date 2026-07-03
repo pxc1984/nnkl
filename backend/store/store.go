@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/pxc1984/backend-rest-go/utils"
+	"github.com/pxc1984/nnkl-backend/utils"
 )
 
 type Store interface {

@@ -1,11 +1,11 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import Activity from '@lucide/svelte/icons/activity'
 
   import { API_URL } from '$lib/config'
   import { Badge } from '$lib/components/ui/badge'
   import * as Card from '$lib/components/ui/card'
   import { getHealth } from '$lib/api/health'
+  import { Activity } from '@lucide/svelte';
 
   let healthStatus = 'Loading...'
   let healthDetails = `GET ${API_URL || '(same origin)'}/api/health`

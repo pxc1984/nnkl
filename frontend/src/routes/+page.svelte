@@ -42,7 +42,7 @@
                                 <button
                                     type="button"
                                     class={useDomesticSources
-                                        ? "bg-blue-600 text-white hover:bg-blue-500 inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm transition-colors"
+                                        ? "from-white via-blue-500 to-red-500 text-black inline-flex items-center gap-2 rounded-full bg-linear-to-r px-3 py-2 text-sm transition-colors"
                                         : "bg-muted text-muted-foreground hover:bg-muted/80 inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm transition-colors"}
                                     on:click={() => (useDomesticSources = !useDomesticSources)}
                                 >

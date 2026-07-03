@@ -11,6 +11,8 @@ type settings struct {
 	Port             int           `envconfig:"PORT" default:"8080"`
 	LogLevel         string        `envconfig:"LOG_LEVEL" default:"INFO"`
 	StoreBackend     string        `envconfig:"STORE_BACKEND" default:"memory"`
+	OCRServiceURL    string        `envconfig:"OCR_SERVICE_URL" default:"http://ocr:8000/api/v1"`
+	MaxUploadSizeMB  int64         `envconfig:"MAX_UPLOAD_SIZE_MB" default:"50"`
 	PostgresHost     string        `envconfig:"POSTGRES_HOST" default:"db"`
 	PostgresPort     int           `envconfig:"POSTGRES_PORT" default:"5432"`
 	PostgresUser     string        `envconfig:"POSTGRES_USER" default:"admin"`

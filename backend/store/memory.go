@@ -3,10 +3,13 @@ package store
 import (
 	"context"
 	"errors"
+	"slices"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 	"gorm.io/gorm"
 )
 
@@ -16,6 +19,7 @@ type InMemoryStore struct {
 	byEmail  map[string]string
 	sessions map[string]Session
 	byHash   map[string]string
+	blobs    map[string]InputBlob
 }
 
 func NewInMemoryStore() *InMemoryStore {
@@ -24,6 +28,7 @@ func NewInMemoryStore() *InMemoryStore {
 		byEmail:  make(map[string]string),
 		sessions: make(map[string]Session),
 		byHash:   make(map[string]string),
+		blobs:    make(map[string]InputBlob),
 	}
 }
 
@@ -249,6 +254,74 @@ func (s *InMemoryStore) DeleteUserSessions(_ context.Context, userID string) err
 	return nil
 }
 
+func (s *InMemoryStore) CreateInputBlob(_ context.Context, params CreateInputBlobParams) (*InputBlob, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	now := time.Now().UTC()
+	blob := InputBlob{
+		ID:          uuid.NewString(),
+		Filename:    params.Filename,
+		FileType:    params.FileType,
+		ContentType: params.ContentType,
+		Tags:        pq.StringArray(append([]string(nil), params.Tags...)),
+		SizeBytes:   params.SizeBytes,
+		SHA256:      params.SHA256,
+		Content:     append([]byte(nil), params.Content...),
+		CreatedAt:   now,
+	}
+	s.blobs[blob.ID] = blob
+	return cloneInputBlob(blob), nil
+}
+
+func (s *InMemoryStore) ListInputBlobs(_ context.Context, params ListInputBlobsParams) ([]InputBlob, int64, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	filtered := make([]InputBlob, 0)
+	for _, blob := range s.blobs {
+		if params.Query != "" && !strings.Contains(strings.ToLower(blob.Filename), strings.ToLower(params.Query)) {
+			continue
+		}
+		if params.FileType != "" && blob.FileType != strings.ToLower(params.FileType) {
+			continue
+		}
+		if !containsAllTags(blob.Tags, params.Tags) {
+			continue
+		}
+		filtered = append(filtered, blob)
+	}
+
+	slices.SortFunc(filtered, func(a, b InputBlob) int {
+		return b.CreatedAt.Compare(a.CreatedAt)
+	})
+
+	page := params.Page
+	if page <= 0 {
+		page = 1
+	}
+	pageSize := params.PageSize
+	if pageSize <= 0 {
+		pageSize = 20
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
+	start := (page - 1) * pageSize
+	if start >= len(filtered) {
+		return []InputBlob{}, int64(len(filtered)), nil
+	}
+	end := start + pageSize
+	if end > len(filtered) {
+		end = len(filtered)
+	}
+
+	items := make([]InputBlob, 0, end-start)
+	for _, blob := range filtered[start:end] {
+		items = append(items, *cloneInputBlob(blob))
+	}
+	return items, int64(len(filtered)), nil
+}
+
 func cloneUser(user User) *User {
 	clone := user
 	return &clone
@@ -257,4 +330,27 @@ func cloneUser(user User) *User {
 func cloneSession(session Session) *Session {
 	clone := session
 	return &clone
+}
+
+func cloneInputBlob(blob InputBlob) *InputBlob {
+	clone := blob
+	clone.Tags = pq.StringArray(append([]string(nil), blob.Tags...))
+	clone.Content = append([]byte(nil), blob.Content...)
+	return &clone
+}
+
+func containsAllTags(blobTags, filterTags []string) bool {
+	if len(filterTags) == 0 {
+		return true
+	}
+	available := make(map[string]struct{}, len(blobTags))
+	for _, tag := range blobTags {
+		available[strings.ToLower(tag)] = struct{}{}
+	}
+	for _, tag := range filterTags {
+		if _, ok := available[strings.ToLower(tag)]; !ok {
+			return false
+		}
+	}
+	return true
 }

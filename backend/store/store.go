@@ -27,6 +27,8 @@ type Store interface {
 	DeleteSessionByID(context.Context, string) error
 	DeleteSessionByUserAndHash(context.Context, string, string) error
 	DeleteUserSessions(context.Context, string) error
+	CreateInputBlob(context.Context, CreateInputBlobParams) (*InputBlob, error)
+	ListInputBlobs(context.Context, ListInputBlobsParams) ([]InputBlob, int64, error)
 }
 
 var globalStore Store

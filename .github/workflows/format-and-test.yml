@@ -71,6 +71,10 @@ jobs:
         working-directory: frontend
         run: pnpm run check
 
+      - name: Run frontend lint
+        working-directory: frontend
+        run: pnpm run lint
+
   test-backend:
     needs: format
     runs-on: ubuntu-latest

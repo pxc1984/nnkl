@@ -8,6 +8,12 @@ export default tseslint.config(
   ...tseslint.configs.recommended,
   ...svelte.configs.recommended,
   {
+    files: ["**/*.ts", "**/*.tsx", "**/*.mts", "**/*.cts"],
+    languageOptions: {
+      parser: tseslint.parser,
+    },
+  },
+  {
     languageOptions: {
       globals: {
         ...globals.browser,
@@ -23,6 +29,12 @@ export default tseslint.config(
     },
   },
   {
-    ignores: [".svelte-kit/**", "dist/**", "node_modules/**"],
+    files: ["src/lib/components/ui/button/button.svelte"],
+    rules: {
+      "svelte/no-navigation-without-resolve": "off",
+    },
+  },
+  {
+    ignores: [".svelte-kit/**", "dist/**", "build/**", "node_modules/**"],
   },
 );

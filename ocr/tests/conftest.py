@@ -6,6 +6,7 @@ import os
 import sys
 from collections.abc import Generator
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
@@ -15,8 +16,6 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 # Лёгкие моки docling для unit-тестов без тяжёлых зависимостей
 if "docling" not in sys.modules:
-    from unittest.mock import MagicMock
-
     _mock_format = MagicMock()
     _mock_format.PDF = "pdf"
     for _name in [
@@ -40,45 +39,37 @@ if "docling" not in sys.modules:
     sys.modules["docling.datamodel.base_models"].InputFormat = _mock_format
     sys.modules["docling.datamodel.pipeline_options"].AcceleratorOptions = MagicMock
 
-# Тестовые настройки до импорта приложения
-TEST_BASE = Path(__file__).resolve().parent / "fixtures" / "pdfs"
-TEST_RESULTS = Path(__file__).resolve().parent / "fixtures" / "results"
+TEST_ROOT = Path(__file__).resolve().parent / "fixtures"
+TEST_DATABASE = TEST_ROOT / "test.sqlite3"
 
-os.environ.setdefault("ALLOWED_BASE_PATH", str(TEST_BASE))
-os.environ.setdefault("RESULTS_DIR", str(TEST_RESULTS))
-os.environ.setdefault("REDIS_URL", "redis://localhost:6379/0")
-os.environ.setdefault("CELERY_BROKER_URL", "redis://localhost:6379/0")
-os.environ.setdefault("CELERY_RESULT_BACKEND", "redis://localhost:6379/1")
+os.environ.setdefault("DATABASE_URL", f"sqlite:///{TEST_DATABASE}")
+os.environ.setdefault("TEMP_DIR", str(TEST_ROOT / "tmp"))
 os.environ.setdefault("DOCLING_USE_GPU", "false")
+os.environ.setdefault("DOCLING_DO_FORMULA_ENRICHMENT", "false")
 
 
 @pytest.fixture(autouse=True)
 def setup_dirs() -> Generator[None, None, None]:
-    TEST_BASE.mkdir(parents=True, exist_ok=True)
-    TEST_RESULTS.mkdir(parents=True, exist_ok=True)
+    TEST_ROOT.mkdir(parents=True, exist_ok=True)
+    if TEST_DATABASE.exists():
+        TEST_DATABASE.unlink()
     yield
-
-
-@pytest.fixture
-def allowed_base() -> Path:
-    return TEST_BASE
+    if TEST_DATABASE.exists():
+        TEST_DATABASE.unlink()
 
 
 @pytest.fixture
 def client() -> Generator[TestClient, None, None]:
-    from app.config import get_settings
     from app.main import app
 
-    get_settings.cache_clear()
     with TestClient(app) as test_client:
         yield test_client
-    get_settings.cache_clear()
 
 
 @pytest.fixture
-def sample_pdf(allowed_base: Path) -> Path:
+def sample_pdf() -> Path:
     """Минимальный валидный PDF для тестов."""
-    pdf_path = allowed_base / "sample.pdf"
+    pdf_path = TEST_ROOT / "sample.pdf"
     import fitz
 
     doc = fitz.open()
@@ -91,3 +82,12 @@ def sample_pdf(allowed_base: Path) -> Path:
     doc.save(pdf_path)
     doc.close()
     return pdf_path
+
+
+@pytest.fixture
+def db_session(client: TestClient):
+    session = client.app.state.session_factory()
+    try:
+        yield session
+    finally:
+        session.close()

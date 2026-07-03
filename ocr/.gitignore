@@ -6,10 +6,7 @@ __pycache__/
 venv/
 .pytest_cache/
 .mypy_cache/
-data/results/*
-!data/results/.gitkeep
-data/pdfs/*
-!data/pdfs/.gitkeep
-data/models/
+tests/fixtures/test.sqlite3
+tests/fixtures/tmp/
 *.tex
 *.log

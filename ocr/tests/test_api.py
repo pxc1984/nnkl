@@ -2,103 +2,104 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+import uuid
+from pathlib import Path
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
+
+from app.db.models import InputBlob, ParseJob
+
+
+def _insert_blob(db_session, sample_pdf: Path, blob_id: str = "blob-1") -> InputBlob:
+    blob = InputBlob(
+        id=blob_id,
+        filename=sample_pdf.name,
+        content_type="application/pdf",
+        content=sample_pdf.read_bytes(),
+    )
+    db_session.add(blob)
+    db_session.commit()
+    return blob
 
 
 class TestHealthEndpoint:
     def test_health_returns_response(self, client: TestClient) -> None:
-        with patch("redis.from_url") as mock_from_url:
-            mock_client = MagicMock()
-            mock_client.ping.return_value = True
-            mock_from_url.return_value = mock_client
-
-            with patch("app.api.routes.celery_app.control.inspect") as mock_inspect_fn:
-                mock_inspect = MagicMock()
-                mock_inspect.ping.return_value = {"worker1": "pong"}
-                mock_inspect_fn.return_value = mock_inspect
-
-                response = client.get("/api/v1/health")
+        response = client.get("/api/v1/health")
 
         assert response.status_code == 200
         data = response.json()
-        assert "status" in data
-        assert "redis" in data
-        assert "celery" in data
+        assert data == {"status": "ok", "api": "ok", "database": "ok"}
 
 
-class TestConvertEndpoint:
-    @patch("app.api.routes.celery_app.send_task")
-    def test_convert_missing_file_returns_404(
-        self,
-        _mock_send: MagicMock,
-        client: TestClient,
-        allowed_base,
-    ) -> None:
+class TestParseEndpoint:
+    @patch("app.use_cases.parse_document.get_ocr_service")
+    def test_parse_persists_result(self, mock_get_ocr_service, client: TestClient, db_session, sample_pdf: Path) -> None:
+        _insert_blob(db_session, sample_pdf)
+        ocr_service = mock_get_ocr_service.return_value
+        ocr_service.convert.return_value = ("parsed content", None)
+
         response = client.post(
-            "/api/v1/convert",
-            json={"file_path": str(allowed_base / "nonexistent.pdf")},
+            "/api/v1/parse",
+            json={
+                "document_id": "doc-1",
+                "input_blob_id": "blob-1",
+                "output_format": "latex",
+                "language": "auto",
+            },
         )
+
+        assert response.status_code == 201
+        data = response.json()
+        assert data["document_id"] == "doc-1"
+        assert data["status"] == "completed"
+        assert data["result_id"]
+
+        job = db_session.query(ParseJob).filter(ParseJob.document_id == "doc-1").one()
+        assert job.status == "completed"
+        assert job.result is not None
+        assert job.result.content_text == "parsed content"
+
+    def test_parse_missing_blob_returns_404(self, client: TestClient) -> None:
+        response = client.post(
+            "/api/v1/parse",
+            json={
+                "document_id": "doc-missing",
+                "input_blob_id": "blob-missing",
+                "output_format": "latex",
+                "language": "auto",
+            },
+        )
+
         assert response.status_code == 404
 
-    @patch("app.api.routes.celery_app.send_task")
-    def test_convert_validation_error(self, _mock_send: MagicMock, client: TestClient) -> None:
-        response = client.post("/api/v1/convert", json={})
-        assert response.status_code == 422
 
+class TestStatusAndResultEndpoints:
+    @patch("app.use_cases.parse_document.get_ocr_service")
+    def test_status_and_result_return_db_content(self, mock_get_ocr_service, client: TestClient, db_session, sample_pdf: Path) -> None:
+        document_id = f"doc-{uuid.uuid4()}"
+        _insert_blob(db_session, sample_pdf, blob_id="blob-2")
+        ocr_service = mock_get_ocr_service.return_value
+        ocr_service.convert.return_value = ("# markdown", None)
 
-class TestQueueEndpoint:
-    @patch("app.api.routes.get_queue_snapshot")
-    def test_queue_returns_snapshot(self, mock_snapshot: MagicMock, client: TestClient) -> None:
-        from app.api.schemas import QueueResponse, QueueTaskItem, TaskStatus
-
-        mock_snapshot.return_value = QueueResponse(
-            total=2,
-            pending_count=1,
-            processing_count=1,
-            scheduled_count=0,
-            pending=[
-                QueueTaskItem(
-                    task_id="task-pending-1",
-                    status=TaskStatus.PENDING,
-                    file_path="/data/pdfs/a.pdf",
-                ),
-            ],
-            processing=[
-                QueueTaskItem(
-                    task_id="task-active-1",
-                    status=TaskStatus.PROCESSING,
-                    file_path="/data/pdfs/b.pdf",
-                    progress=30,
-                    worker="celery@worker1",
-                ),
-            ],
+        parse_response = client.post(
+            "/api/v1/parse",
+            json={
+                "document_id": document_id,
+                "input_blob_id": "blob-2",
+                "output_format": "markdown",
+                "language": "en",
+            },
         )
+        assert parse_response.status_code == 201
 
-        response = client.get("/api/v1/queue")
+        status_response = client.get(f"/api/v1/status/{document_id}")
+        assert status_response.status_code == 200
+        assert status_response.json()["status"] == "completed"
 
-        assert response.status_code == 200
-        data = response.json()
-        assert data["total"] == 2
-        assert data["pending_count"] == 1
-        assert data["processing_count"] == 1
-        assert len(data["pending"]) == 1
-        assert data["pending"][0]["task_id"] == "task-pending-1"
-
-    @patch("app.api.routes.get_queue_snapshot")
-    def test_queue_status_filter(self, mock_snapshot: MagicMock, client: TestClient) -> None:
-        from app.api.schemas import QueueResponse
-
-        mock_snapshot.return_value = QueueResponse(
-            total=0,
-            pending_count=0,
-            processing_count=0,
-            scheduled_count=0,
-        )
-
-        response = client.get("/api/v1/queue", params={"status": "processing"})
-
-        assert response.status_code == 200
-        mock_snapshot.assert_called_once()
-        assert mock_snapshot.call_args.kwargs["status_filter"].value == "processing"
+        result_response = client.get(f"/api/v1/result/{document_id}")
+        assert result_response.status_code == 200
+        data = result_response.json()
+        assert data["content_type"] == "text/markdown"
+        assert data["content_text"] == "# markdown"
+        assert data["has_assets_zip"] is False

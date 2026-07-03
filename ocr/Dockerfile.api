@@ -17,7 +17,7 @@ RUN pip install --upgrade pip && \
 
 COPY app/ ./app/
 
-RUN mkdir -p /app/results /app/tmp /data/pdfs
+RUN mkdir -p /app/tmp /app/models
 
 EXPOSE 8000
 

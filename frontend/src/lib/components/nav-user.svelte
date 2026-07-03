@@ -3,7 +3,7 @@
     import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
     import * as Sidebar from "$lib/components/ui/sidebar/index.js";
     import {useSidebar} from "$lib/components/ui/sidebar/index.js";
-	import { BadgeCheckIcon, BellIcon, ChevronsUpDownIcon, CreditCardIcon, LogOutIcon, SparklesIcon } from "@lucide/svelte";
+	import { BadgeCheckIcon, BellIcon, ChevronsUpDownIcon, LogOutIcon } from "@lucide/svelte";
 
     let {
         user,

@@ -1,0 +1,20 @@
+﻿[
+    {
+        "source_pdf":  "/data/pdfs/test.pdf",
+        "task_id":  "05711898-49cd-4da8-965c-6b20abfed348",
+        "tex":  "doc_001.tex",
+        "index":  1
+    },
+    {
+        "source_pdf":  "/data/pdfs/doc.pdf",
+        "task_id":  "95a1bb64-9f14-45eb-8111-d55c98f02557",
+        "tex":  "doc_002.tex",
+        "index":  2
+    },
+    {
+        "source_pdf":  "/data/pdfs/conf.pdf",
+        "task_id":  "de7d82d6-36e7-4784-923f-468ea74c62f8",
+        "tex":  "doc_003.tex",
+        "index":  3
+    }
+]

@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - ALLOWED_BASE_PATH=/data/pdfs
+      - RESULTS_DIR=/app/results
+    volumes:
+      - ./data/pdfs:/data/pdfs:ro
+      - ./data/results:/app/results
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    env_file:
+      - .env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - ALLOWED_BASE_PATH=/data/pdfs
+      - RESULTS_DIR=/app/results
+      - DOCLING_USE_GPU=false
+      - DOCLING_DO_FORMULA_ENRICHMENT=false
+      - DOCLING_PRELOAD_MODELS=false
+      - TASK_SOFT_TIME_LIMIT=1800
+      - TASK_TIME_LIMIT=2100
+    volumes:
+      - ./data/pdfs:/data/pdfs:ro
+      - ./data/results:/app/results
+      - ./data/models:/app/models
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  redis_data:

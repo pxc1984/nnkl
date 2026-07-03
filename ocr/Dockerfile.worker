@@ -1,0 +1,33 @@
+FROM python:3.11-slim-bookworm
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    DEBIAN_FRONTEND=noninteractive \
+    DOCLING_USE_GPU=false
+
+WORKDIR /app
+
+# Системные зависимости для Docling и обработки PDF
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgl1 \
+    libglib2.0-0 \
+    libgomp1 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Python зависимости
+COPY requirements.txt .
+RUN pip install --upgrade pip && \
+    pip install -r requirements.txt
+
+# Код приложения
+COPY app/ ./app/
+COPY scripts/ ./scripts/
+
+# Директории для данных
+RUN mkdir -p /app/results /app/tmp /data/pdfs /app/models
+
+CMD ["celery", "-A", "app.workers.celery_app:celery_app", "worker", "--loglevel=info", "--concurrency=1"]

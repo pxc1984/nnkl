@@ -64,7 +64,6 @@ Tables are created automatically on startup.
 ## Local run
 
 ```bash
-cd ocr
 cp .env.example .env
 docker compose up --build
 ```
@@ -73,6 +72,8 @@ Services:
 
 - API: `http://localhost:8000`
 - Postgres: `localhost:5432`
+
+OCR is started from the root `docker-compose.yml` and uses the shared root `.env`.
 
 ## Test
 

@@ -23,22 +23,24 @@
 		time: string;
 		active?: boolean;
 	};
-	type NavSecondaryItem = NavItem & {
+	type SidebarUser = {
+		name: string;
+		email: string;
+		avatar?: string | null;
+	};
+	type SidebarData = {
+		user: SidebarUser;
+		navMain: NavMainItem[];
+		navSecondary: NavSecondaryItem[];
+		queries: ProjectItem[];
+	};
+ 	type NavSecondaryItem = NavItem & {
 		// This should be `Component` after @lucide/svelte updates types
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		icon: any;
 	};
 
-	export let appSidebarData: {
-		user: {
-			name: string;
-			email: string;
-			avatar: string;
-		};
-		navMain: NavMainItem[];
-		navSecondary: NavSecondaryItem[];
-		queries: ProjectItem[];
-	} = {
+	export const defaultAppSidebarData: SidebarData = {
 		user: {
 			name: "Владимир Потанин",
 			email: "potanin@nornickel.ru",
@@ -153,9 +155,11 @@
 	};
 
 	export type { NavUrl };
+	export type { SidebarData, SidebarUser };
 </script>
 
 <script lang="ts">
+	import type { UserProfile } from "$lib/auth/types";
 	import NavMain from "./nav-main.svelte";
 	import NavProjects from "./nav-projects.svelte";
 	import NavSecondary from "./nav-secondary.svelte";
@@ -163,7 +167,25 @@
 	import * as Sidebar from "$lib/components/ui/sidebar/index.js";
 	import type { ComponentProps } from "svelte";
 
-	let { ref = $bindable(null), ...restProps }: ComponentProps<typeof Sidebar.Root> = $props();
+	let {
+		ref = $bindable(null),
+		currentUser = null,
+		appSidebarData = defaultAppSidebarData,
+		...restProps
+	}: ComponentProps<typeof Sidebar.Root> & {
+		currentUser?: UserProfile | null;
+		appSidebarData?: SidebarData;
+	} = $props();
+
+	const sidebarUser = $derived(
+		currentUser
+			? {
+				name: currentUser.name?.trim() || currentUser.email,
+				email: currentUser.email,
+				avatar: currentUser.avatarUrl || "/potanin.jpg",
+			}
+			: appSidebarData.user,
+	);
 </script>
 
 <Sidebar.Root bind:ref variant="inset" {...restProps}>
@@ -188,6 +210,6 @@
 		<NavSecondary items={appSidebarData.navSecondary} class="mt-auto" />
 	</Sidebar.Content>
 	<Sidebar.Footer>
-		<NavUser user={appSidebarData.user} />
+		<NavUser user={sidebarUser} />
 	</Sidebar.Footer>
 </Sidebar.Root>

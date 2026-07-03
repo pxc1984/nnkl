@@ -3,13 +3,14 @@
     import { Button } from "$lib/components/ui/button/index.js";
     import * as Sidebar from "$lib/components/ui/sidebar/index.js";
     import { ArrowUpIcon, GlobeIcon } from "@lucide/svelte";
+	import { authState } from "$lib/auth/store";
 
     let prompt = "";
     let useDomesticSources = false;
 </script>
 
 <Sidebar.Provider>
-    <AppSidebar />
+	<AppSidebar currentUser={$authState.user} />
     <Sidebar.Inset class="bg-background min-h-screen">
         <header class="flex h-16 shrink-0 items-center justify-between px-4 md:px-6">
             <div class="flex items-center gap-3">

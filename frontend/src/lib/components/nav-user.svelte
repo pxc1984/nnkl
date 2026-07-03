@@ -1,9 +1,12 @@
 <script lang="ts">
+	import { goto } from "$app/navigation";
+	import { resolve } from "$app/paths";
     import * as Avatar from "$lib/components/ui/avatar/index.js";
     import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
     import * as Sidebar from "$lib/components/ui/sidebar/index.js";
+	import { logout } from "$lib/auth/store";
     import {useSidebar} from "$lib/components/ui/sidebar/index.js";
-	import { BadgeCheckIcon, BellIcon, ChevronsUpDownIcon, CreditCardIcon, LogOutIcon, SparklesIcon } from "@lucide/svelte";
+	import { BadgeCheckIcon, BellIcon, ChevronsUpDownIcon, LogOutIcon } from "@lucide/svelte";
 
     let {
         user,
@@ -11,11 +14,32 @@
         user: {
             name: string;
             email: string;
-            avatar: string;
+            avatar?: string | null;
         };
     } = $props();
 
     const sidebar = useSidebar();
+	let isLoggingOut = $state(false);
+
+	const avatarFallback = $derived(
+		user.name
+			.split(" ")
+			.filter(Boolean)
+			.slice(0, 2)
+			.map((part) => part[0]?.toUpperCase() ?? "")
+			.join("") || user.email.slice(0, 2).toUpperCase(),
+	);
+
+	async function handleLogout(): Promise<void> {
+		if (isLoggingOut) {
+			return;
+		}
+
+		isLoggingOut = true;
+		await logout();
+		await goto(resolve("/auth/login"));
+		isLoggingOut = false;
+	}
 </script>
 
 <Sidebar.Menu>
@@ -29,8 +53,8 @@
                             class="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
                     >
                         <Avatar.Root class="size-8 rounded-lg">
-                            <Avatar.Image src={user.avatar} alt={user.name}/>
-                            <Avatar.Fallback class="rounded-lg">CN</Avatar.Fallback>
+                            <Avatar.Image src={user.avatar ?? undefined} alt={user.name}/>
+                            <Avatar.Fallback class="rounded-lg">{avatarFallback}</Avatar.Fallback>
                         </Avatar.Root>
                         <div class="grid flex-1 text-start text-sm leading-tight">
                             <span class="truncate font-medium">{user.name}</span>
@@ -49,8 +73,8 @@
                 <DropdownMenu.Label class="p-0 font-normal">
                     <div class="flex items-center gap-2 px-1 py-1.5 text-start text-sm">
                         <Avatar.Root class="size-8 rounded-lg">
-                            <Avatar.Image src={user.avatar} alt={user.name}/>
-                            <Avatar.Fallback class="rounded-lg">CN</Avatar.Fallback>
+                            <Avatar.Image src={user.avatar ?? undefined} alt={user.name}/>
+                            <Avatar.Fallback class="rounded-lg">{avatarFallback}</Avatar.Fallback>
                         </Avatar.Root>
                         <div class="grid flex-1 text-start text-sm leading-tight">
                             <span class="truncate font-medium">{user.name}</span>
@@ -70,9 +94,9 @@
                     </DropdownMenu.Item>
                 </DropdownMenu.Group>
                 <DropdownMenu.Separator/>
-                <DropdownMenu.Item>
+                <DropdownMenu.Item disabled={isLoggingOut} onclick={handleLogout}>
                     <LogOutIcon/>
-                    Выйти
+                    {isLoggingOut ? "Выходим..." : "Выйти"}
                 </DropdownMenu.Item>
             </DropdownMenu.Content>
         </DropdownMenu.Root>

@@ -25,7 +25,6 @@ func NewInMemoryStore() *InMemoryStore {
 		sessions: make(map[string]Session),
 		byHash:   make(map[string]string),
 	}
-
 }
 
 func (s *InMemoryStore) Backend() string {

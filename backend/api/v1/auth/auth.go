@@ -16,7 +16,6 @@ type AuthAPI struct {
 type registerRequest struct {
 	Email    string `json:"email" binding:"required,email"`
 	Name     string `json:"name"`
-	Role     string `json:"role" binding:"omitempty,oneof=admin user"`
 	Password string `json:"password" binding:"required,min=8"`
 }
 

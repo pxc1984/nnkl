@@ -26,22 +26,9 @@ func (a *AuthAPI) register(c *gin.Context) {
 		return
 	}
 
-	role := req.Role
-	if role == "" {
-		role = "user"
-	}
-
+	role := "guest"
 	if count == 0 {
 		role = "admin"
-	} else {
-		user, ok := api.AuthenticateRequest(c, a.store, a.tokens)
-		if !ok {
-			return
-		}
-		if user.Role != "admin" {
-			api.RespondError(c, http.StatusForbidden, "admin role required", "forbidden")
-			return
-		}
 	}
 
 	passwordHash, err := auth2.HashPassword(req.Password)

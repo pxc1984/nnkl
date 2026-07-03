@@ -2,7 +2,7 @@ export type UserProfile = {
   id: string;
   email: string;
   name?: string;
-  role: "admin" | "user";
+  role: "admin" | "guest";
   emailVerified: boolean;
   avatarUrl?: string | null;
   lastLoginAt?: string | null;
@@ -29,5 +29,4 @@ export type RegisterPayload = {
   email: string;
   name: string;
   password: string;
-  role?: "admin" | "user";
 };

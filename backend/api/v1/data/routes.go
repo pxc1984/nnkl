@@ -23,4 +23,5 @@ func RegisterDataRoutes(router gin.IRouter) {
 	protected.Use(api.RequireAuth(a.store, auth2.NewManager(utils.Settings.AuthSecret, utils.Settings.AccessTokenTTL, utils.Settings.RefreshTokenTTL)))
 	protected.GET("", a.list)
 	protected.POST("", a.upload)
+	registerObjectRoutes(protected, a)
 }

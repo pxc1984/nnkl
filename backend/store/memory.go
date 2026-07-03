@@ -20,6 +20,7 @@ type InMemoryStore struct {
 	sessions map[string]Session
 	byHash   map[string]string
 	blobs    map[string]InputBlob
+	jobs     map[string]ParseJob
 }
 
 func NewInMemoryStore() *InMemoryStore {
@@ -29,6 +30,7 @@ func NewInMemoryStore() *InMemoryStore {
 		sessions: make(map[string]Session),
 		byHash:   make(map[string]string),
 		blobs:    make(map[string]InputBlob),
+		jobs:     make(map[string]ParseJob),
 	}
 }
 
@@ -320,6 +322,67 @@ func (s *InMemoryStore) ListInputBlobs(_ context.Context, params ListInputBlobsP
 		items = append(items, *cloneInputBlob(blob))
 	}
 	return items, int64(len(filtered)), nil
+}
+
+func (s *InMemoryStore) GetInputBlobByID(_ context.Context, id string) (*InputBlob, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	blob, ok := s.blobs[id]
+	if !ok {
+		return nil, gorm.ErrRecordNotFound
+	}
+	return cloneInputBlob(blob), nil
+}
+
+func (s *InMemoryStore) UpdateInputBlob(_ context.Context, id string, params UpdateInputBlobParams) (*InputBlob, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	blob, ok := s.blobs[id]
+	if !ok {
+		return nil, gorm.ErrRecordNotFound
+	}
+	if params.Filename != nil {
+		blob.Filename = *params.Filename
+	}
+	if params.FileType != nil {
+		blob.FileType = strings.ToLower(*params.FileType)
+	}
+	if params.ContentType != nil {
+		blob.ContentType = *params.ContentType
+	}
+	blob.Tags = pq.StringArray(append([]string(nil), params.Tags...))
+	if params.ReplaceFile {
+		blob.Content = append([]byte(nil), params.Content...)
+		if params.SizeBytes != nil {
+			blob.SizeBytes = *params.SizeBytes
+		}
+		blob.SHA256 = params.SHA256
+	}
+	blob.UpdatedAt = time.Now().UTC()
+	s.blobs[id] = blob
+	return cloneInputBlob(blob), nil
+}
+
+func (s *InMemoryStore) DeleteInputBlobByID(_ context.Context, id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.blobs[id]; !ok {
+		return gorm.ErrRecordNotFound
+	}
+	delete(s.blobs, id)
+	delete(s.jobs, id)
+	return nil
+}
+
+func (s *InMemoryStore) GetParseJobByDocumentID(_ context.Context, documentID string) (*ParseJob, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	job, ok := s.jobs[documentID]
+	if !ok {
+		return nil, gorm.ErrRecordNotFound
+	}
+	clone := job
+	return &clone, nil
 }
 
 func cloneUser(user User) *User {

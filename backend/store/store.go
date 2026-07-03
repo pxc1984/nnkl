@@ -29,6 +29,10 @@ type Store interface {
 	DeleteUserSessions(context.Context, string) error
 	CreateInputBlob(context.Context, CreateInputBlobParams) (*InputBlob, error)
 	ListInputBlobs(context.Context, ListInputBlobsParams) ([]InputBlob, int64, error)
+	GetInputBlobByID(context.Context, string) (*InputBlob, error)
+	UpdateInputBlob(context.Context, string, UpdateInputBlobParams) (*InputBlob, error)
+	DeleteInputBlobByID(context.Context, string) error
+	GetParseJobByDocumentID(context.Context, string) (*ParseJob, error)
 }
 
 var globalStore Store

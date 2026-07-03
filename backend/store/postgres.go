@@ -42,7 +42,7 @@ func NewPostgresStore() (*PostgresStore, error) {
 	}
 
 	store := &PostgresStore{db: db, sqldb: sqldb}
-	if err := store.db.AutoMigrate(&User{}, &Session{}, &InputBlob{}); err != nil {
+	if err := store.db.AutoMigrate(&User{}, &Session{}, &InputBlob{}, &ParseJob{}, &ParseResult{}); err != nil {
 		_ = sqldb.Close()
 		return nil, fmt.Errorf("migrate postgres schema: %w", err)
 	}
@@ -227,6 +227,73 @@ func (s *PostgresStore) ListInputBlobs(ctx context.Context, params ListInputBlob
 	var blobs []InputBlob
 	err := query.Order("created_at desc").Offset((page - 1) * pageSize).Limit(pageSize).Find(&blobs).Error
 	return blobs, total, err
+}
+
+func (s *PostgresStore) GetInputBlobByID(ctx context.Context, id string) (*InputBlob, error) {
+	var blob InputBlob
+	if err := s.db.WithContext(ctx).First(&blob, "id = ?", id).Error; err != nil {
+		return nil, err
+	}
+	return &blob, nil
+}
+
+func (s *PostgresStore) UpdateInputBlob(ctx context.Context, id string, params UpdateInputBlobParams) (*InputBlob, error) {
+	updates := map[string]any{}
+	if params.Filename != nil {
+		updates["filename"] = *params.Filename
+	}
+	if params.FileType != nil {
+		updates["file_type"] = strings.ToLower(*params.FileType)
+	}
+	if params.ContentType != nil {
+		updates["content_type"] = *params.ContentType
+	}
+	updates["tags"] = pq.StringArray(params.Tags)
+	if params.ReplaceFile {
+		updates["content"] = params.Content
+		if params.SizeBytes != nil {
+			updates["size_bytes"] = *params.SizeBytes
+		}
+		updates["sha256"] = params.SHA256
+	}
+	if err := s.db.WithContext(ctx).Model(&InputBlob{}).Where("id = ?", id).Updates(updates).Error; err != nil {
+		return nil, err
+	}
+	return s.GetInputBlobByID(ctx, id)
+}
+
+func (s *PostgresStore) DeleteInputBlobByID(ctx context.Context, id string) error {
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var blob InputBlob
+		if err := tx.First(&blob, "id = ?", id).Error; err != nil {
+			return err
+		}
+		var jobs []ParseJob
+		if err := tx.Where("input_blob_id = ? OR document_id = ?", id, id).Find(&jobs).Error; err != nil {
+			return err
+		}
+		jobIDs := make([]string, 0, len(jobs))
+		for _, job := range jobs {
+			jobIDs = append(jobIDs, job.ID)
+		}
+		if len(jobIDs) > 0 {
+			if err := tx.Where("job_id IN ?", jobIDs).Delete(&ParseResult{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Where("id IN ?", jobIDs).Delete(&ParseJob{}).Error; err != nil {
+				return err
+			}
+		}
+		return tx.Delete(&InputBlob{}, "id = ?", id).Error
+	})
+}
+
+func (s *PostgresStore) GetParseJobByDocumentID(ctx context.Context, documentID string) (*ParseJob, error) {
+	var job ParseJob
+	if err := s.db.WithContext(ctx).Preload("Result").Where("document_id = ?", documentID).First(&job).Error; err != nil {
+		return nil, err
+	}
+	return &job, nil
 }
 
 func max(value, fallback int) int {

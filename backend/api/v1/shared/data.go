@@ -14,6 +14,22 @@ type KnowledgeObjectResponse struct {
 	Tags        []string  `json:"tags"`
 	SizeBytes   int64     `json:"sizeBytes"`
 	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
+}
+
+type KnowledgeObject struct {
+	KnowledgeObjectResponse
+	Status string `json:"status,omitempty"`
+}
+
+type KnowledgeObjectDetails struct {
+	KnowledgeObject
+	SHA256       *string `json:"sha256,omitempty"`
+	HasContent   bool    `json:"hasContent"`
+	HasResult    bool    `json:"hasResult"`
+	OutputFormat string  `json:"outputFormat,omitempty"`
+	Language     string  `json:"language,omitempty"`
+	Error        *string `json:"error,omitempty"`
 }
 
 type PaginatedKnowledgeObjectList struct {
@@ -32,6 +48,7 @@ func ToKnowledgeObjectResponse(blob *store.InputBlob) KnowledgeObjectResponse {
 		Tags:        append([]string(nil), blob.Tags...),
 		SizeBytes:   blob.SizeBytes,
 		CreatedAt:   blob.CreatedAt,
+		UpdatedAt:   blob.UpdatedAt,
 	}
 }
 

@@ -129,8 +129,7 @@
     @apply bg-background text-foreground;
   }
 
-  body,
-  #app {
+  body {
     @apply min-h-screen;
   }
 }

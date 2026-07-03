@@ -4,9 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 
 	"github.com/pxc1984/nnkl-backend/utils"
 	"gorm.io/driver/postgres"
@@ -40,7 +42,7 @@ func NewPostgresStore() (*PostgresStore, error) {
 	}
 
 	store := &PostgresStore{db: db, sqldb: sqldb}
-	if err := store.db.AutoMigrate(&User{}, &Session{}); err != nil {
+	if err := store.db.AutoMigrate(&User{}, &Session{}, &InputBlob{}); err != nil {
 		_ = sqldb.Close()
 		return nil, fmt.Errorf("migrate postgres schema: %w", err)
 	}
@@ -177,4 +179,59 @@ func (s *PostgresStore) DeleteSessionByUserAndHash(ctx context.Context, userID, 
 
 func (s *PostgresStore) DeleteUserSessions(ctx context.Context, userID string) error {
 	return s.db.WithContext(ctx).Delete(&Session{}, "user_id = ?", userID).Error
+}
+
+func (s *PostgresStore) CreateInputBlob(ctx context.Context, params CreateInputBlobParams) (*InputBlob, error) {
+	blob := &InputBlob{
+		ID:          uuid.NewString(),
+		Filename:    params.Filename,
+		FileType:    strings.ToLower(params.FileType),
+		ContentType: params.ContentType,
+		Tags:        pq.StringArray(params.Tags),
+		SizeBytes:   params.SizeBytes,
+		SHA256:      params.SHA256,
+		Content:     params.Content,
+	}
+	if err := s.db.WithContext(ctx).Create(blob).Error; err != nil {
+		return nil, err
+	}
+	return blob, nil
+}
+
+func (s *PostgresStore) ListInputBlobs(ctx context.Context, params ListInputBlobsParams) ([]InputBlob, int64, error) {
+	page := max(params.Page, 1)
+	pageSize := params.PageSize
+	if pageSize <= 0 {
+		pageSize = 20
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
+
+	query := s.db.WithContext(ctx).Model(&InputBlob{})
+	if params.Query != "" {
+		query = query.Where("filename ILIKE ?", "%"+params.Query+"%")
+	}
+	if params.FileType != "" {
+		query = query.Where("file_type = ?", strings.ToLower(params.FileType))
+	}
+	if len(params.Tags) > 0 {
+		query = query.Where("tags @> ?", pq.Array(params.Tags))
+	}
+
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	var blobs []InputBlob
+	err := query.Order("created_at desc").Offset((page - 1) * pageSize).Limit(pageSize).Find(&blobs).Error
+	return blobs, total, err
+}
+
+func max(value, fallback int) int {
+	if value > fallback {
+		return value
+	}
+	return fallback
 }

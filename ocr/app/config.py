@@ -16,17 +16,30 @@ class Settings(BaseSettings):
     )
 
     app_name: str = "PDF OCR Service"
-    debug: bool = False
-    log_level: str = "INFO"
+    ocr_debug: bool = False
+    ocr_log_level: str = "INFO"
 
-    database_url: str = "postgresql+psycopg://postgres:postgres@postgres:5432/ocr"
-    temp_dir: Path = Path("/app/tmp")
+    postgres_host: str = "localhost"
+    postgres_port: int = 5432
+    postgres_user: str = "admin"
+    postgres_password: str = "admin"
+    postgres_db: str = "db"
+    postgres_ssl_mode: str = "disable"
+    @property
+    def database_url(self) -> str:
+        return (
+            f"postgresql+psycopg://{self.postgres_user}:{self.postgres_password}"
+            f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
+            f"?sslmode={self.postgres_ssl_mode}"
+        )
 
-    docling_artifacts_path: Path | None = None
-    docling_use_gpu: bool = False
-    docling_do_formula_enrichment: bool = False
+    ocr_temp_dir: Path = Path("/app/tmp")
 
-    api_prefix: str = "/api/v1"
+    ocr_docling_artifacts_path: Path | None = None
+    ocr_docling_use_gpu: bool = False
+    ocr_docling_do_formula_enrichment: bool = False
+
+    ocr_api_prefix: str = "/api/v1"
 
 
 def get_settings() -> Settings:

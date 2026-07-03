@@ -182,7 +182,7 @@ def _parse_broker_message(raw: bytes | str) -> QueueTaskItem | None:
             language=kwargs.get("language"),
         )
     except (json.JSONDecodeError, TypeError, KeyError) as exc:
-        logger.debug("queue.broker_message_parse_failed", error=str(exc))
+        logger.ocr_debug("queue.broker_message_parse_failed", error=str(exc))
         return None
 
 

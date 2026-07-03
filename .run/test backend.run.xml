@@ -2,8 +2,31 @@
   <configuration default="false" name="test backend" type="GoTestRunConfiguration" factoryName="Go Test">
     <module name="nnkl" />
     <working_directory value="$PROJECT_DIR$/backend" />
+    <envs>
+      <env name="ACCESS_TOKEN_TTL" value="15m" />
+      <env name="AUTH_SECRET" value="change-me-in-production" />
+      <env name="GIN_MODE" value="debug" />
+      <env name="HOST" value="0.0.0.0" />
+      <env name="LOG_LEVEL" value="INFO" />
+      <env name="MAX_UPLOAD_SIZE_MB" value="50" />
+      <env name="OCR_API_PREFIX" value="/api/v1" />
+      <env name="OCR_DOCLING_DO_FORMULA_ENRICHMENT" value="false" />
+      <env name="OCR_DOCLING_USE_GPU" value="false" />
+      <env name="OCR_LOG_LEVEL" value="INFO" />
+      <env name="OCR_SERVICE_URL" value="http://ocr:8000/api/v1" />
+      <env name="OCR_TEMP_DIR" value="/app/tmp" />
+      <env name="PORT" value="8080" />
+      <env name="POSTGRES_DB" value="db" />
+      <env name="POSTGRES_HOST" value="localhost" />
+      <env name="POSTGRES_PASSWORD" value="admin" />
+      <env name="POSTGRES_PORT" value="5432" />
+      <env name="POSTGRES_SSLMODE" value="disable" />
+      <env name="POSTGRES_USER" value="admin" />
+      <env name="REFRESH_TOKEN_TTL" value="720h" />
+      <env name="STORE_BACKEND" value="postgres" />
+    </envs>
     <EXTENSION ID="net.ashald.envfile">
-      <option name="IS_ENABLED" value="false" />
+      <option name="IS_ENABLED" value="true" />
       <option name="IS_SUBST" value="false" />
       <option name="IS_PATH_MACRO_SUPPORTED" value="false" />
       <option name="IS_IGNORE_MISSING_FILES" value="false" />

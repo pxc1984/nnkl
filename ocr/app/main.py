@@ -21,7 +21,7 @@ settings = get_settings()
 
 def _configure_logging() -> None:
     """Настройка structlog для JSON-логов в продакшене."""
-    log_level = getattr(logging, settings.log_level.upper(), logging.INFO)
+    log_level = getattr(logging, settings.ocr_log_level.upper(), logging.INFO)
     logging.basicConfig(level=log_level, format="%(message)s")
 
     structlog.configure(
@@ -42,7 +42,7 @@ def _configure_logging() -> None:
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     """Lifecycle: настройка логирования, временной директории и БД."""
     _configure_logging()
-    settings.temp_dir.mkdir(parents=True, exist_ok=True)
+    settings.ocr_temp_dir.mkdir(parents=True, exist_ok=True)
     _app.state.session_factory = create_session_factory(settings)
     _app.state.engine = _app.state.session_factory.engine
     structlog.get_logger(__name__).info(
@@ -84,4 +84,4 @@ async def correlation_id_middleware(request: Request, call_next):
     return response
 
 
-app.include_router(router, prefix=settings.api_prefix)
+app.include_router(router, prefix=settings.ocr_api_prefix)

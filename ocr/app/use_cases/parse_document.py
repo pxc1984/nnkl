@@ -53,7 +53,7 @@ def parse_document(
         job.error = None
     session.commit()
 
-    work_dir = Path(tempfile.mkdtemp(prefix=f"ocr_{job.id}_", dir=str(settings.temp_dir)))
+    work_dir = Path(tempfile.mkdtemp(prefix=f"ocr_{job.id}_", dir=str(settings.ocr_temp_dir)))
     try:
         input_path = work_dir / _resolve_filename(blob.filename)
         input_path.write_bytes(blob.content)
@@ -115,9 +115,9 @@ def _parse_input_document(
 ) -> tuple[str, Path | None]:
     if input_path.suffix.lower() == ".pdf":
         ocr_service = get_ocr_service(
-            artifacts_path=settings.docling_artifacts_path,
-            use_gpu=settings.docling_use_gpu,
-            do_formula_enrichment=settings.docling_do_formula_enrichment,
+            artifacts_path=settings.ocr_docling_artifacts_path,
+            use_gpu=settings.ocr_docling_use_gpu,
+            do_formula_enrichment=settings.ocr_docling_do_formula_enrichment,
         )
         return ocr_service.convert(
             input_path,

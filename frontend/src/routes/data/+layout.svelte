@@ -28,7 +28,7 @@
 		}
 
 		if (path.startsWith("/data/graph")) {
-			return [{ label: "Материалы", href: "/data" }, { label: "Карта знаний", href: "/data/graph" }] as BCItem[];
+			return [{ label: "Материалы", href: "/data" }, { label: "Карта знаний" }] as BCItem[];
 		}
 
 		if (path === "/data/account") {

@@ -89,9 +89,9 @@
         animationDuration: 500,
         fit: true,
       },
-      wheelSensitivity: 0.2,
+      wheelSensitivity: 4.0,
       minZoom: 0.2,
-      maxZoom: 3,
+      maxZoom: 5,
     });
 
     cy.on("tap", "node", (event) => {

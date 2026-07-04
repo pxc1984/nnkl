@@ -1,73 +1,59 @@
 <script lang="ts">
 	import { browser } from "$app/environment";
-	import { goto } from "$app/navigation";
-	import { resolve } from "$app/paths";
-	import { page } from "$app/state";
 	import { getApiErrorMessage } from "$lib/api/auth";
-	import { listDataTags, listKnowledgeObjects } from "$lib/api/data";
-	import DataEmptyState from "$lib/components/data/data-empty-state.svelte";
-	import DataListItem from "$lib/components/data/data-list-item.svelte";
-	import DataPageHeader from "$lib/components/data/data-page-header.svelte";
-	import { Button } from "$lib/components/ui/button/index.js";
-	import * as Card from "$lib/components/ui/card/index.js";
-	import { Input } from "$lib/components/ui/input/index.js";
+	import { listKnowledgeObjects } from "$lib/api/data";
+	import DataStatusBadge from "$lib/components/data/data-status-badge.svelte";
+	import { Button, buttonVariants } from "$lib/components/ui/button/index.js";
 	import { Skeleton } from "$lib/components/ui/skeleton/index.js";
-	import { Badge } from "$lib/components/ui/badge/index.js";
-	import type { DataTag, KnowledgeObject, PaginationMeta } from "$lib/data/types";
+	import * as Table from "$lib/components/ui/table/index.js";
 	import {
-		buildDataSearchParams,
-		DEFAULT_DATA_PAGE_SIZE,
-		getTagsFromSearchParams,
-		parseTagsInput,
-	} from "$lib/data/utils";
-	import { SearchIcon, XIcon } from "@lucide/svelte";
+		FlexRender,
+		createSvelteTable,
+		renderComponent,
+		renderSnippet,
+	} from "$lib/components/ui/data-table/index.js";
+	import type {
+		ColumnDef,
+		PaginationState,
+	} from "@tanstack/table-core";
+	import { getCoreRowModel } from "@tanstack/table-core";
+	import type { KnowledgeObject, PaginationMeta } from "$lib/data/types";
+	import { formatBytes, formatDateTime, getObjectTitle, getObjectTypeLabel } from "$lib/data/utils";
+	import ChevronLeftIcon from "@lucide/svelte/icons/chevron-left";
+	import ChevronRightIcon from "@lucide/svelte/icons/chevron-right";
+	import { cn } from "$lib/utils.js";
+	import { createRawSnippet } from "svelte";
+
+	const PAGE_SIZE = 20;
 
 	let objects = $state<KnowledgeObject[]>([]);
-	let meta = $state<PaginationMeta>({ page: 1, pageSize: DEFAULT_DATA_PAGE_SIZE, total: 0, totalPages: 0 });
-	let availableTags = $state<DataTag[]>([]);
-	let queryInput = $state("");
-	let typeInput = $state("");
-	let tagsInput = $state("");
+	let paginationMeta = $state<PaginationMeta>({ page: 1, pageSize: PAGE_SIZE, total: 0, totalPages: 1 });
 	let isLoading = $state(false);
-	let isLoadingTags = $state(false);
 	let errorMessage = $state("");
+	let currentPage = $state(1);
+	let pagination = $state<PaginationState>({ pageIndex: 0, pageSize: PAGE_SIZE });
 	let requestRun = 0;
-	let tagsLoaded = false;
 
-	function syncFilterInputs(searchParams: URLSearchParams): void {
-		queryInput = searchParams.get("query") ?? "";
-		typeInput = searchParams.get("type") ?? "";
-		tagsInput = getTagsFromSearchParams(searchParams).join(", ");
-	}
-
-	async function loadObjects(searchParams: URLSearchParams): Promise<void> {
+	async function loadData(pageNum: number): Promise<void> {
 		const currentRun = ++requestRun;
 		isLoading = true;
 		errorMessage = "";
 
 		try {
-			const response = await listKnowledgeObjects({
-				page: Number(searchParams.get("page") || 1),
-				pageSize: Number(searchParams.get("pageSize") || DEFAULT_DATA_PAGE_SIZE),
-				query: searchParams.get("query") ?? undefined,
-				type: searchParams.get("type") ?? undefined,
-				tags: getTagsFromSearchParams(searchParams),
-			});
-
+			const response = await listKnowledgeObjects({ page: pageNum, pageSize: PAGE_SIZE });
 			if (currentRun !== requestRun) {
 				return;
 			}
 
 			objects = response.items;
-			meta = response.meta;
+			paginationMeta = response.meta;
 		} catch (error) {
 			if (currentRun !== requestRun) {
 				return;
 			}
 
-			errorMessage = getApiErrorMessage(error, "Не удалось загрузить документы.");
+			errorMessage = getApiErrorMessage(error, "Не удалось загрузить список материалов.");
 			objects = [];
-			meta = { page: 1, pageSize: DEFAULT_DATA_PAGE_SIZE, total: 0, totalPages: 0 };
 		} finally {
 			if (currentRun === requestRun) {
 				isLoading = false;
@@ -75,201 +61,218 @@
 		}
 	}
 
-	async function loadTags(): Promise<void> {
-		isLoadingTags = true;
-
-		try {
-			const response = await listDataTags();
-			availableTags = response.items.slice(0, 8);
-		} catch {
-			availableTags = [];
-		} finally {
-			isLoadingTags = false;
-		}
-	}
-
 	$effect(() => {
-		syncFilterInputs(page.url.searchParams);
-
 		if (!browser) {
 			return;
 		}
 
-		void loadObjects(page.url.searchParams);
+		void loadData(currentPage);
 	});
 
-	$effect(() => {
-		if (!browser || tagsLoaded) {
-			return;
-		}
+	const totalPages = $derived(paginationMeta.totalPages ?? 1);
+	const totalItems = $derived(paginationMeta.total ?? 0);
 
-		tagsLoaded = true;
-		void loadTags();
+	const titleSnippet = createRawSnippet<[{ title: string }]>((getTitle) => {
+		const { title } = getTitle();
+		return {
+			render: () => `<span class="font-medium block truncate">${title}</span>`,
+		};
 	});
 
-	async function updateRoute(overrides: Partial<{
-		page: number;
-		pageSize: number;
-		query: string;
-		type: string;
-		tags: string[];
-	}>): Promise<void> {
-		const searchParams = buildDataSearchParams({
-			page: overrides.page ?? Number(page.url.searchParams.get("page") || 1),
-			pageSize: overrides.pageSize ?? Number(page.url.searchParams.get("pageSize") || DEFAULT_DATA_PAGE_SIZE),
-			query: overrides.query ?? queryInput,
-			type: overrides.type ?? typeInput,
-			tags: overrides.tags ?? parseTagsInput(tagsInput),
-		});
+	const typeSnippet = createRawSnippet<[{ type: string }]>((getType) => {
+		const { type } = getType();
+		return {
+			render: () => `<span class="text-muted-foreground">${type}</span>`,
+		};
+	});
 
-		const search = searchParams.toString();
-		await goto(search ? resolve(`/data?${search}` as `/data?${string}`) : resolve("/data"), {
-			keepFocus: true,
-			noScroll: true,
-		});
-	}
+	const sizeSnippet = createRawSnippet<[{ size: string }]>((getSize) => {
+		const { size } = getSize();
+		return {
+			render: () => `<span class="text-muted-foreground">${size}</span>`,
+		};
+	});
 
-	async function handleFilterSubmit(event: SubmitEvent): Promise<void> {
-		event.preventDefault();
-		await updateRoute({ page: 1 });
-	}
+	const dateSnippet = createRawSnippet<[{ date: string }]>((getDate) => {
+		const { date } = getDate();
+		return {
+			render: () => `<span class="text-muted-foreground">${date}</span>`,
+		};
+	});
 
-	async function clearFilters(): Promise<void> {
-		queryInput = "";
-		typeInput = "";
-		tagsInput = "";
-		await updateRoute({ page: 1, query: "", type: "", tags: [] });
-	}
+	const actionSnippet = createRawSnippet<[{ id: string }]>((getId) => {
+		const { id } = getId();
+		const classes = cn(
+			buttonVariants({ variant: "outline", size: "sm" }),
+			"rounded-full",
+		);
+		return {
+			render: () => `<a href="/data/${id}" class="${classes}">Открыть</a>`,
+		};
+	});
 
-	async function toggleQuickTag(tag: string): Promise<void> {
-		const currentTags = parseTagsInput(tagsInput);
-		const nextTags = currentTags.includes(tag)
-			? currentTags.filter((currentTag) => currentTag !== tag)
-			: [...currentTags, tag];
+	const columns: ColumnDef<KnowledgeObject>[] = [
+		{
+			accessorKey: "filename",
+			header: "Название",
+			cell: ({ row }) => renderSnippet(titleSnippet, { title: getObjectTitle(row.original) }),
+		},
+		{
+			accessorKey: "mimeType",
+			header: "Тип",
+			cell: ({ row }) => renderSnippet(typeSnippet, { type: getObjectTypeLabel(row.original) }),
+		},
+		{
+			accessorKey: "size",
+			header: "Размер",
+			cell: ({ row }) => renderSnippet(sizeSnippet, { size: formatBytes(row.original.size) }),
+		},
+		{
+			accessorKey: "status",
+			header: "Статус",
+			cell: ({ row }) => renderComponent(DataStatusBadge, { status: row.original.status }),
+		},
+		{
+			accessorKey: "createdAt",
+			header: "Загружен",
+			cell: ({ row }) => renderSnippet(dateSnippet, { date: formatDateTime(row.original.createdAt) }),
+		},
+		{
+			id: "actions",
+			header: "",
+			cell: ({ row }) => renderSnippet(actionSnippet, { id: row.original.id }),
+		},
+	];
 
-		tagsInput = nextTags.join(", ");
-		await updateRoute({ page: 1, tags: nextTags });
-	}
-
-	const selectedTags = $derived(parseTagsInput(tagsInput));
-	const totalPages = $derived(meta.totalPages || Math.max(1, Math.ceil(meta.total / Math.max(meta.pageSize, 1))));
+	const table = createSvelteTable({
+		get data() {
+			return objects;
+		},
+		columns,
+		getCoreRowModel: getCoreRowModel(),
+		manualPagination: true,
+		get pageCount() {
+			return totalPages;
+		},
+		state: {
+			get pagination() {
+				return pagination;
+			},
+		},
+		onPaginationChange: (updater) => {
+			if (typeof updater === "function") {
+				pagination = updater(pagination);
+			} else {
+				pagination = updater;
+			}
+			currentPage = pagination.pageIndex + 1;
+		},
+	});
 </script>
 
-<div class="flex flex-col gap-8">
-	<DataPageHeader
-		title="Документы"
-		description="Загруженные и доступные вам материалы. Используйте поиск и фильтры, чтобы быстро находить нужные документы."
-	>
-		{#snippet actions()}
-			<Button href="/data/upload" class="rounded-full">Загрузить</Button>
-		{/snippet}
-	</DataPageHeader>
+<div class="flex flex-col justify-between h-full">
+	{#if errorMessage}
+		<div class="text-destructive bg-destructive/10 rounded-2xl border border-destructive/20 px-4 py-3 text-sm">
+			{errorMessage}
+		</div>
+	{/if}
 
-	<Card.Root class="bg-card/90 rounded-[1.75rem] border-border/60 shadow-[0_20px_60px_-36px_rgba(0,0,0,0.35)]">
-		<Card.Header class="gap-4 border-b border-border/60 pb-5">
-			<div class="space-y-1">
-				<Card.Title class="text-lg">Поиск и фильтры</Card.Title>
-				<Card.Description>Состояние фильтров сохраняется в URL и им можно поделиться.</Card.Description>
-			</div>
-		</Card.Header>
-		<Card.Content class="space-y-5 pt-5">
-			<form class="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,0.8fr)_minmax(0,1fr)_auto]" onsubmit={handleFilterSubmit}>
-				<div class="relative">
-					<SearchIcon class="text-muted-foreground pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2" />
-					<Input bind:value={queryInput} placeholder="Название, автор или часть документа" class="h-10 rounded-full pl-9" />
+	{#if isLoading}
+		<div class="rounded-md border p-6">
+			{#each [1, 2, 3, 4, 5, 6] as i (i)}
+				<div class="flex items-center gap-4 py-3">
+					<Skeleton class="h-5 w-48 rounded-full" />
+					<Skeleton class="h-5 w-20 rounded-full" />
+					<Skeleton class="h-5 w-16 rounded-full" />
+					<Skeleton class="h-5 w-20 rounded-full" />
+					<Skeleton class="h-5 w-32 rounded-full" />
+					<Skeleton class="h-5 w-28 rounded-full" />
+					<Skeleton class="ms-auto h-8 w-24 rounded-full" />
 				</div>
-				<Input bind:value={typeInput} placeholder="Тип файла: pdf, docx" class="h-10 rounded-full" />
-				<Input bind:value={tagsInput} placeholder="Теги через запятую" class="h-10 rounded-full" />
-				<div class="flex gap-2">
-					<Button type="submit" class="h-10 rounded-full">Применить</Button>
-					<Button type="button" variant="ghost" class="h-10 rounded-full" onclick={clearFilters}>Очистить</Button>
-				</div>
-			</form>
-
-			<div class="flex flex-wrap gap-2">
-				{#if isLoadingTags}
-					{#each [0, 1, 2, 3] as index (index)}
-						<Skeleton class="h-8 w-24 rounded-full" />
+			{/each}
+		</div>
+	{:else}
+		<div class="rounded-md border">
+			<Table.Root class="table-fixed">
+				<Table.Header>
+					{#each table.getHeaderGroups() as headerGroup (headerGroup.id)}
+						<Table.Row>
+							{#each headerGroup.headers as header (header.id)}
+								<Table.Head class={cn("has-[[role=checkbox]]:ps-3", header.column.id === "mimeType" && "hidden md:table-cell w-24", header.column.id === "filename" && "w-full min-w-0", header.column.id === "size" && "w-20", header.column.id === "status" && "w-24", header.column.id === "createdAt" && "w-36", header.column.id === "actions" && "w-24")}>
+									{#if !header.isPlaceholder}
+										<FlexRender
+											content={header.column.columnDef.header}
+											context={header.getContext()}
+										/>
+									{/if}
+								</Table.Head>
+							{/each}
+						</Table.Row>
 					{/each}
-				{:else}
-					{#each availableTags as tag (tag.name)}
-						<button
-							type="button"
-							class={selectedTags.includes(tag.name)
-								? "bg-primary text-primary-foreground inline-flex h-8 items-center gap-2 rounded-full px-3 text-sm"
-								: "bg-muted text-muted-foreground hover:bg-muted/80 inline-flex h-8 items-center gap-2 rounded-full px-3 text-sm transition-colors"}
-							onclick={() => void toggleQuickTag(tag.name)}
-						>
-							<span>{tag.name}</span>
-							<Badge variant={selectedTags.includes(tag.name) ? "secondary" : "outline"}>{tag.count}</Badge>
-						</button>
+				</Table.Header>
+				<Table.Body>
+					{#each table.getRowModel().rows as row (row.id)}
+						<Table.Row>
+							{#each row.getVisibleCells() as cell (cell.id)}
+								<Table.Cell class={cn("has-[[role=checkbox]]:ps-3", cell.column.id === "mimeType" && "hidden md:table-cell", cell.column.id === "filename" && "min-w-0")}>
+									<FlexRender
+										content={cell.column.columnDef.cell}
+										context={cell.getContext()}
+									/>
+								</Table.Cell>
+							{/each}
+						</Table.Row>
+					{:else}
+						<Table.Row>
+							<Table.Cell colspan={columns.length} class="h-24 text-center">
+								Нет результатов.
+							</Table.Cell>
+						</Table.Row>
 					{/each}
-				{/if}
-			</div>
-		</Card.Content>
-	</Card.Root>
-
-	<div class="flex flex-col gap-4">
-		<div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-			<div>
-				<p class="text-foreground text-sm font-medium">{meta.total} документов</p>
-				<p class="text-muted-foreground text-sm">
-					Страница {meta.page} из {totalPages}
-				</p>
-			</div>
-
-			{#if selectedTags.length > 0}
-				<div class="flex flex-wrap gap-2">
-					{#each selectedTags as tag (tag)}
-						<button type="button" class="bg-muted inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm" onclick={() => void toggleQuickTag(tag)}>
-							{tag}
-							<XIcon class="size-3.5" />
-						</button>
-					{/each}
-				</div>
-			{/if}
+				</Table.Body>
+			</Table.Root>
 		</div>
 
-		{#if errorMessage}
-			<div class="text-destructive bg-destructive/10 rounded-2xl border border-destructive/20 px-4 py-3 text-sm">{errorMessage}</div>
-		{:else if isLoading}
-			<div class="space-y-4">
-				{#each [0, 1, 2, 3] as index (index)}
-					<div class="bg-card/90 rounded-[1.5rem] border border-border/60 px-5 py-5">
-						<Skeleton class="h-6 w-64 rounded-full" />
-						<div class="mt-4 flex flex-wrap gap-3">
-							<Skeleton class="h-4 w-28 rounded-full" />
-							<Skeleton class="h-4 w-24 rounded-full" />
-							<Skeleton class="h-4 w-40 rounded-full" />
-						</div>
-					</div>
-				{/each}
-			</div>
-		{:else if objects.length === 0}
-			<DataEmptyState
-				title="Документы не найдены"
-				description="Попробуйте изменить строку поиска или убрать часть фильтров. Если база еще пуста, начните с загрузки первого документа."
-				actionLabel="Загрузить документы"
-				actionHref="/data/upload"
-			/>
-		{:else}
-			<div class="space-y-4">
-				{#each objects as object (object.id)}
-					<DataListItem {object} />
-				{/each}
-			</div>
-		{/if}
-	</div>
+		<div class="flex items-center justify-between pt-4 bottom-4">
+			<p class="text-muted-foreground text-sm">
+				{totalItems === 1
+					? "1 материал"
+					: `${totalItems} материалов`}
+			</p>
 
-	{#if !isLoading && !errorMessage && meta.total > 0}
-		<div class="flex flex-col gap-3 border-t border-border/60 pt-6 sm:flex-row sm:items-center sm:justify-between">
-			<p class="text-muted-foreground text-sm">Показываем {objects.length} из {meta.total}</p>
-			<div class="flex gap-2">
-				<Button variant="outline" class="rounded-full" disabled={meta.page <= 1} onclick={() => void updateRoute({ page: meta.page - 1 })}>
-					Назад
+			<div class="flex items-center gap-2">
+				<Button
+					variant="outline"
+					size="sm"
+					class="rounded-full"
+					disabled={!table.getCanPreviousPage()}
+					onclick={() => table.previousPage()}
+				>
+					<ChevronLeftIcon class="size-4" />
 				</Button>
-				<Button variant="outline" class="rounded-full" disabled={meta.page >= totalPages} onclick={() => void updateRoute({ page: meta.page + 1 })}>
-					Далее
+
+				{#each Array.from({ length: Math.min(totalPages, 7) }, (__, i) => {
+					const start = Math.max(0, Math.min(currentPage - 4, totalPages - 7));
+					return start + i + 1;
+				}) as pageNum (pageNum)}
+					<Button
+						variant={pageNum === currentPage ? "default" : "outline"}
+						size="sm"
+						class="rounded-full min-w-9"
+						onclick={() => table.setPageIndex(pageNum - 1)}
+					>
+						{pageNum}
+					</Button>
+				{/each}
+
+				<Button
+					variant="outline"
+					size="sm"
+					class="rounded-full"
+					disabled={!table.getCanNextPage()}
+					onclick={() => table.nextPage()}
+				>
+					<ChevronRightIcon class="size-4" />
 				</Button>
 			</div>
 		</div>

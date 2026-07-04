@@ -4,7 +4,7 @@
     import NetworkIcon from "@lucide/svelte/icons/network";
     import Settings2Icon from "@lucide/svelte/icons/settings-2";
     import SquareTerminalIcon from "@lucide/svelte/icons/square-terminal";
-    import {SearchIcon} from "@lucide/svelte";
+    import {Database, SearchIcon} from "@lucide/svelte";
 
     type Pathname = ReturnType<AppTypes["Pathname"]>;
     type NavUrl = "#" | Pathname | `http${string}`;
@@ -62,11 +62,11 @@
             {
                 title: "Материалы",
                 url: "/data",
-                icon: SquareTerminalIcon,
+                icon: Database,
                 isActive: true,
                 items: [
                     {
-                        title: "Ваши материалы",
+                        title: "Список",
                         url: "/data",
                     },
                     {

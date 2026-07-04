@@ -42,7 +42,7 @@ func NewPostgresStore() (*PostgresStore, error) {
 	}
 
 	store := &PostgresStore{db: db, sqldb: sqldb}
-	if err := store.db.AutoMigrate(&User{}, &Session{}, &InputBlob{}, &ParseJob{}, &ParseResult{}); err != nil {
+	if err := store.db.AutoMigrate(&User{}, &Session{}, &InputBlob{}); err != nil {
 		_ = sqldb.Close()
 		return nil, fmt.Errorf("migrate postgres schema: %w", err)
 	}

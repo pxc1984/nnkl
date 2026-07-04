@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { Button } from "$lib/components/ui/button/index.js";
 	import { ArrowUpIcon, GlobeIcon } from "@lucide/svelte";
-	import { askQuestion, type AskResponse } from "$lib/api/ask";
+	import { streamQuestion, type AskResponse } from "$lib/api/ask";
 	import { getApiErrorMessage } from "$lib/api/auth";
 
 	let prompt = $state("");
@@ -21,8 +21,13 @@
 		answer = null;
 
 		try {
-			const mode = useDomesticSources ? "local" : "hybrid";
-			answer = await askQuestion(query, mode);
+			const mode = useDomesticSources ? "local" : "naive";
+			answer = { answer: "", mode };
+			await streamQuestion(query, mode, (chunk) => {
+				if (answer) {
+					answer = { ...answer, answer: answer.answer + chunk };
+				}
+			});
 		} catch (error) {
 			errorMessage = getApiErrorMessage(error, "Не удалось получить ответ от базы знаний.");
 		} finally {

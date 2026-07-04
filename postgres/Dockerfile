@@ -1,6 +1,6 @@
 FROM postgres:16-bookworm AS build
 
-ARG AGE_VERSION=master
+ARG AGE_VERSION=release/PG16/1.6.0
 ARG PGVECTOR_VERSION=v0.8.1
 
 RUN apt-get update && apt-get install -y --no-install-recommends \

@@ -12,7 +12,7 @@ import (
 )
 
 func RegisterDataRoutes(router gin.IRouter) {
-	client := &http.Client{Timeout: 2 * time.Minute}
+	client := &http.Client{Timeout: 10 * time.Minute}
 	a := &DataAPI{
 		store:    store.GetStore(),
 		ocr:      NewOCRClient(utils.Settings.OCRServiceURL, client),
@@ -25,5 +25,6 @@ func RegisterDataRoutes(router gin.IRouter) {
 	protected.GET("", a.list)
 	protected.POST("", a.upload)
 	protected.POST("/ask", a.ask)
+	protected.POST("/ask/stream", a.askStream)
 	registerObjectRoutes(protected, a)
 }

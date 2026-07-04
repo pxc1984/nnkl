@@ -12,6 +12,25 @@ docker compose up --build
 http://localhost:9689
 ```
 
+LightRAG API и Web UI:
+
+```text
+http://localhost:9621
+```
+
+При первом запуске Ollama скачает локальные модели. После запуска сервисов
+индексация документов выполняется отдельно:
+
+```bash
+docker compose --profile tools run --rm lightrag-indexer
+```
+
+Перед полной индексацией проверьте GPU командой
+`docker compose exec ollama ollama ps` во время пробного запроса.
+
+Повторный запуск команды безопасно инициирует сканирование каталога документов.
+Индекс и модели сохраняются в Docker volumes `lightrag_data` и `ollama_data`.
+
 ## гайд как разрабатывать
 
 Backend:
@@ -61,6 +80,7 @@ PORT=8080
 LOG_LEVEL=INFO
 GIN_MODE=release
 STORE_BACKEND=memory
+LIGHTRAG_URL=http://lightrag:9621
 AUTH_SECRET=change-me-in-production
 ACCESS_TOKEN_TTL=15m
 REFRESH_TOKEN_TTL=720h
@@ -76,3 +96,4 @@ REFRESH_TOKEN_TTL=720h
 ```env
 API_URL=
 ```
+

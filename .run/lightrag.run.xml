@@ -1,0 +1,140 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="lightrag" type="docker-deploy" factoryName="docker-image" server-name="local">
+    <deployment type="docker-image">
+      <settings>
+        <option name="imageTag" value="nnkl-lightrag" />
+        <option name="command" value="lightrag-server --host 0.0.0.0 --port 9621 --working-dir /app/data/rag_storage --input-dir /app/data/inputs --workers 1" />
+        <option name="containerName" value="lightrag" />
+        <option name="envVars">
+          <list>
+            <DockerEnvVarImpl>
+              <option name="name" value="CORS_ORIGINS" />
+              <option name="value" value="*" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="EMBEDDING_BATCH_NUM" />
+              <option name="value" value="16" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="EMBEDDING_BINDING" />
+              <option name="value" value="openai" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="EMBEDDING_BINDING_API_KEY" />
+              <option name="value" value="" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="EMBEDDING_BINDING_HOST" />
+              <option name="value" value="https://api.openai.com/v1" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="EMBEDDING_DIM" />
+              <option name="value" value="3072" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="EMBEDDING_FUNC_MAX_ASYNC" />
+              <option name="value" value="8" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="EMBEDDING_MODEL" />
+              <option name="value" value="text-embedding-3-large" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="EMBEDDING_SEND_DIM" />
+              <option name="value" value="false" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="EMBEDDING_TOKEN_LIMIT" />
+              <option name="value" value="8192" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="EMBEDDING_USE_BASE64" />
+              <option name="value" value="true" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="LIGHTRAG_DOC_STATUS_STORAGE" />
+              <option name="value" value="PGDocStatusStorage" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="LIGHTRAG_GRAPH_STORAGE" />
+              <option name="value" value="PGGraphStorage" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="LIGHTRAG_KV_STORAGE" />
+              <option name="value" value="PGKVStorage" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="LIGHTRAG_VECTOR_STORAGE" />
+              <option name="value" value="PGVectorStorage" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="LLM_BINDING" />
+              <option name="value" value="openai" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="LLM_BINDING_API_KEY" />
+              <option name="value" value="" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="LLM_BINDING_HOST" />
+              <option name="value" value="https://api.openai.com/v1" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="LLM_MODEL" />
+              <option name="value" value="gpt-4o-mini" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="MAX_ASYNC_LLM" />
+              <option name="value" value="4" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="MAX_PARALLEL_INSERT" />
+              <option name="value" value="2" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="POSTGRES_DATABASE" />
+              <option name="value" value="db" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="POSTGRES_HOST" />
+              <option name="value" value="localhost" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="POSTGRES_PASSWORD" />
+              <option name="value" value="admin" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="POSTGRES_PORT" />
+              <option name="value" value="5432" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="POSTGRES_USER" />
+              <option name="value" value="admin" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="POSTGRES_VECTOR_INDEX_TYPE" />
+              <option name="value" value="HNSW" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="SUMMARY_LANGUAGE" />
+              <option name="value" value="Russian" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="WORKSPACE" />
+              <option name="value" value="default" />
+            </DockerEnvVarImpl>
+          </list>
+        </option>
+        <option name="portBindings">
+          <list>
+            <DockerPortBindingImpl>
+              <option name="containerPort" value="9621" />
+              <option name="hostPort" value="9621" />
+            </DockerPortBindingImpl>
+          </list>
+        </option>
+      </settings>
+    </deployment>
+    <method v="2" />
+  </configuration>
+</component>

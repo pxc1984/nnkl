@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"mime/multipart"
 	"net/http"
 	"path/filepath"
@@ -29,7 +30,30 @@ func (a *DataAPI) reprocessBlob(c *gin.Context, blobID, outputFormat, language s
 		api.RespondError(c, http.StatusBadGateway, fmt.Sprintf("ocr parse failed: %v", err), "ocr_error")
 		return err
 	}
+
+	if outputFormat == "markdown" && a.lightrag != nil && a.lightrag.IsConfigured() {
+		a.sendToLightRAG(c, blobID, outputFormat)
+	}
 	return nil
+}
+
+func (a *DataAPI) sendToLightRAG(c *gin.Context, blobID, outputFormat string) {
+	job, err := a.store.GetParseJobByDocumentID(c.Request.Context(), blobID)
+	if err != nil {
+		slog.Warn("lightrag: failed to fetch parse job", "blob_id", blobID, "error", err)
+		return
+	}
+	if job.Result.ContentText == "" {
+		slog.Warn("lightrag: parse result has no content text", "blob_id", blobID)
+		return
+	}
+
+	source := fmt.Sprintf("%s.md", blobID)
+	if err := a.lightrag.SendText(c.Request.Context(), job.Result.ContentText, source); err != nil {
+		slog.Warn("lightrag: failed to send text", "blob_id", blobID, "error", err)
+		return
+	}
+	slog.Info("lightrag: text indexed", "blob_id", blobID, "source", source)
 }
 
 func (a *DataAPI) persistFile(c *gin.Context, fileHeader *multipart.FileHeader, fileType string, tags []string) (*store.InputBlob, error) {

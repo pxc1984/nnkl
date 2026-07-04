@@ -31,7 +31,7 @@
 	let fileProgressClasses = $derived(entries.map((entry) => getProgressBarClass(entry)));
 	let fileMessages = $derived(entries.map((entry) => entry.errorMessage));
 
-	const SUPPORTED_EXTENSIONS = [".pdf", ".doc", ".docx", ".pptx"];
+	const SUPPORTED_EXTENSIONS = [".pdf", ".docx", ".pptx"];
 
 	function isSupported(name: string): boolean {
 		const lower = name.toLowerCase();
@@ -233,7 +233,7 @@
 			<div class="text-muted-foreground flex flex-col items-center gap-4 text-center">
 				<UploadIcon class="size-16 opacity-40" />
 				<p class="text-lg">Нажмите чтобы выбрать файлы или перетащите их сюда</p>
-				<p class="text-sm">PDF, DOC, DOCX, PPTX, а также ZIP-архивы</p>
+				<p class="text-sm">PDF, DOCX, PPTX, а также ZIP-архивы</p>
 			</div>
 		</div>
 	{:else}

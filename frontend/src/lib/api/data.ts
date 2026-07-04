@@ -63,9 +63,6 @@ export async function uploadKnowledgeObjects(
     "/api/v1/data",
     formData,
     {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
       onUploadProgress,
     },
   );

@@ -36,7 +36,7 @@ def parse_document(
     job = session.query(ParseJob).filter(ParseJob.document_id == request.document_id).one_or_none()
     if job is None:
         job = ParseJob(
-            id=str(uuid.uuid4()),
+            id=uuid.uuid4(),
             document_id=request.document_id,
             input_blob_id=blob.id,
             status=TaskStatus.PROCESSING.value,
@@ -72,7 +72,7 @@ def parse_document(
         result = job.result
         if result is None:
             result = ParseResult(
-                id=str(uuid.uuid4()),
+                id=uuid.uuid4(),
                 job_id=job.id,
                 content_type=_resolve_content_type(request.output_format.value),
                 content_text=content,

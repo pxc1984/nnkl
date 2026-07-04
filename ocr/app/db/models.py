@@ -30,7 +30,7 @@ class ParseJob(Base):
     __tablename__ = "parse_jobs"
     __table_args__ = (UniqueConstraint("document_id", name="uq_parse_jobs_document_id"),)
 
-    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
     document_id: Mapped[str] = mapped_column(String(255), index=True)
     input_blob_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("input_blobs.id"), index=True)
     status: Mapped[str] = mapped_column(String(32), default="pending")
@@ -47,8 +47,8 @@ class ParseJob(Base):
 class ParseResult(Base):
     __tablename__ = "parse_results"
 
-    id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    job_id: Mapped[str] = mapped_column(ForeignKey("parse_jobs.id"), unique=True, index=True)
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    job_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("parse_jobs.id"), unique=True, index=True)
     content_type: Mapped[str] = mapped_column(String(255))
     content_text: Mapped[str] = mapped_column(Text)
     assets_zip: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)

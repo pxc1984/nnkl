@@ -2,9 +2,10 @@
 	import {prependQuerySession} from "$lib/ask/query-sessions";
 	import {Button} from "$lib/components/ui/button/index.js";
 	import MarkdownRenderer from "$lib/components/markdown-renderer.svelte";
-	import {ArrowUpIcon, GlobeIcon} from "@lucide/svelte";
+	import {ArrowUpIcon, GlobeIcon, FileTextIcon} from "@lucide/svelte";
 	import {askQuestion, type AskResponse} from "$lib/api/ask";
 	import {getApiErrorMessage} from "$lib/api/auth";
+	import {goto} from "$app/navigation";
 
 	let prompt = $state("");
 	let useDomesticSources = $state(false);
@@ -47,6 +48,80 @@
 			void handleSubmit();
 		}
 	}
+	
+	// Function to validate document ID format before creating links
+	function isValidDocumentId(id: string): boolean {
+		// Check if it's a proper UUID format (with or without doc- prefix)
+		const uuidPattern = /^(doc-)?[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
+		// Or check if it's a proper SHA256 format (with or without doc- prefix)
+		const sha256Pattern = /^(doc-)?[a-f0-9]{64}$/i;
+		
+		return uuidPattern.test(id) || sha256Pattern.test(id);
+	}
+	
+	// Function to extract document IDs from references and create clickable links
+	function getDocumentLinks() {
+		if (!answer?.references) return [];
+		
+		// Parse references - they could be in various formats depending on LightRAG
+		let refsArray: any[] = [];
+		
+		if (typeof answer.references === 'string') {
+			try {
+				const parsed = JSON.parse(answer.references);
+				refsArray = Array.isArray(parsed) ? parsed : [parsed];
+			} catch {
+				// If it's not valid JSON, try to extract document IDs from the string
+				const idMatches = answer.references.match(/doc-[a-f0-9]{32}|[a-f0-9]{32}|doc-[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}|[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/gi) || [];
+				refsArray = idMatches.map(id => ({ id, source: id }));
+			}
+		} else if (Array.isArray(answer.references)) {
+			refsArray = answer.references;
+		} else if (typeof answer.references === 'object') {
+			refsArray = [answer.references];
+		}
+		
+		// Extract document IDs from the references
+		const documentIds = new Set<string>();
+		refsArray.forEach(ref => {
+			if (ref && typeof ref === 'object') {
+				// Look for various possible field names that might contain document IDs
+				if (ref.file_path) {
+					// Extract document ID from file path if it contains one
+					const pathMatch = ref.file_path.match(/doc-[a-f0-9]{32}|[a-f0-9]{32}|doc-[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}|[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/i);
+					if (pathMatch) documentIds.add(pathMatch[0]);
+				}
+				if (ref.source_id) {
+					const idMatch = ref.source_id.match(/doc-[a-f0-9]{32}|[a-f0-9]{32}|doc-[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}|[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/i);
+					if (idMatch) documentIds.add(idMatch[0]);
+				}
+				if (ref.reference_id) {
+					const idMatch = ref.reference_id.match(/doc-[a-f0-9]{32}|[a-f0-9]{32}|doc-[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}|[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/i);
+					if (idMatch) documentIds.add(idMatch[0]);
+				}
+				if (ref.id) {
+					const idMatch = ref.id.match(/doc-[a-f0-9]{32}|[a-f0-9]{32}|doc-[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}|[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/i);
+					if (idMatch) documentIds.add(idMatch[0]);
+				}
+			}
+		});
+		
+		// Filter to only include valid document IDs
+		return Array.from(documentIds).filter(isValidDocumentId).map(id => ({
+			id,
+			link: `/data/${id}`
+		}));
+	}
+	
+	// Navigate to document page
+	function goToDocument(id: string) {
+		// Validate the ID before navigating
+		if (isValidDocumentId(id)) {
+			void goto(`/data/${id}`);
+		} else {
+			console.warn(`Invalid document ID: ${id}`);
+		}
+	}
 </script>
 
 <main class="flex flex-1 px-4 pb-6 pt-2 md:px-8 md:pb-8">
@@ -62,6 +137,25 @@
 						<span class="rounded-full border border-border/60 bg-muted px-2.5 py-1 text-xs text-muted-foreground">{answer.mode}</span>
 					</div>
 					<MarkdownRenderer markdown={answer.answer} />
+					
+					<!-- Display references as clickable links -->
+					{#if getDocumentLinks().length > 0}
+						<div class="mt-6 pt-4 border-t border-border/60">
+							<h3 class="text-sm font-medium text-foreground mb-3">Источники:</h3>
+							<div class="flex flex-wrap gap-2">
+								{#each getDocumentLinks() as {id, link}}
+									<button 
+										type="button"
+										onclick={() => goToDocument(id)}
+										class="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/20 transition-colors"
+									>
+										<FileTextIcon class="size-3.5" />
+										Документ {id.substring(0, 8)}...
+									</button>
+								{/each}
+							</div>
+						</div>
+					{/if}
 				</div>
 			{:else}
 				<div class="flex flex-1 items-center justify-center rounded-[2rem] px-6 py-16 text-center shadow-[0_24px_80px_-32px_rgba(0,0,0,0.35)] backdrop-blur">

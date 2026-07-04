@@ -10,7 +10,8 @@ export type AskRequest = {
 export type AskResponse = {
   answer: string;
   mode: string;
-  sessionId: string;
+  sessionId?: string;
+  references?: any; // Added references field to handle LightRAG response
 };
 
 export async function askQuestion(

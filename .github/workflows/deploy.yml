@@ -68,5 +68,4 @@ jobs:
           ENV: ${{ secrets.ENV }}
         run: |
           ssh "$SSH_USER@$SSH_HOST" "printf '%s\n' \"$ENV\" > '$DEPLOY_PATH/.env'"
-          ssh "$SSH_USER@$SSH_HOST" "cd '$DEPLOY_PATH' && docker compose down || true"
           ssh "$SSH_USER@$SSH_HOST" "cd '$DEPLOY_PATH' && docker compose -f docker-compose.yml up -d --build"

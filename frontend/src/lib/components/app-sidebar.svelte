@@ -1,5 +1,6 @@
 <script lang="ts" module>
     import type {AppTypes} from "$app/types";
+    import type {SidebarQuerySession} from "$lib/ask/query-sessions";
     import BookOpenIcon from "@lucide/svelte/icons/book-open";
     import NetworkIcon from "@lucide/svelte/icons/network";
     import Settings2Icon from "@lucide/svelte/icons/settings-2";
@@ -18,12 +19,6 @@
         isActive?: boolean;
         items?: NavItem[];
     };
-    type ProjectItem = {
-        name: string;
-        preview: string;
-        time: string;
-        active?: boolean;
-    };
     type SidebarUser = {
         name: string;
         email: string;
@@ -33,7 +28,7 @@
         user: SidebarUser;
         navMain: NavMainItem[];
         navSecondary: NavSecondaryItem[];
-        queries: ProjectItem[];
+        queries: SidebarQuerySession[];
     };
     type NavSecondaryItem = NavItem & {
         // This should be `Component` after @lucide/svelte updates types
@@ -167,6 +162,7 @@
 </script>
 
 <script lang="ts">
+    import {querySessions} from "$lib/ask/query-sessions";
     import type {UserProfile} from "$lib/auth/types";
     import NavMain from "./nav-main.svelte";
     import NavProjects from "./nav-projects.svelte";
@@ -194,6 +190,8 @@
             }
             : appSidebarData.user,
     );
+
+    const sidebarQueries = $derived($querySessions.length > 0 ? $querySessions : appSidebarData.queries);
 </script>
 
 <Sidebar.Root bind:ref variant="inset" {...restProps}>
@@ -215,7 +213,7 @@
     </Sidebar.Header>
     <Sidebar.Content class="overflow-hidden">
         <NavMain items={appSidebarData.navMain}/>
-        <NavProjects queries={appSidebarData.queries}/>
+        <NavProjects queries={sidebarQueries}/>
         <NavSecondary items={appSidebarData.navSecondary} class="mt-auto"/>
     </Sidebar.Content>
     <Sidebar.Footer>

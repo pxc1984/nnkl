@@ -10,6 +10,7 @@ export type AskRequest = {
 export type AskResponse = {
   answer: string;
   mode: string;
+  sessionId: string;
 };
 
 export async function askQuestion(

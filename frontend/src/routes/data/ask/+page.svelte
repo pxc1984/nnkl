@@ -1,8 +1,10 @@
 <script lang="ts">
-	import { Button } from "$lib/components/ui/button/index.js";
-	import { ArrowUpIcon, GlobeIcon } from "@lucide/svelte";
-	import { streamQuestion, type AskResponse } from "$lib/api/ask";
-	import { getApiErrorMessage } from "$lib/api/auth";
+	import {prependQuerySession} from "$lib/ask/query-sessions";
+	import {Button} from "$lib/components/ui/button/index.js";
+	import MarkdownRenderer from "$lib/components/markdown-renderer.svelte";
+	import {ArrowUpIcon, GlobeIcon} from "@lucide/svelte";
+	import {askQuestion, type AskResponse} from "$lib/api/ask";
+	import {getApiErrorMessage} from "$lib/api/auth";
 
 	let prompt = $state("");
 	let useDomesticSources = $state(false);
@@ -22,13 +24,17 @@
 
 		try {
 			const mode = useDomesticSources ? "local" : "naive";
-			answer = { answer: "", mode };
-			await streamQuestion(query, mode, (chunk) => {
-				if (answer) {
-					answer = { ...answer, answer: answer.answer + chunk };
-				}
-			});
+			answer = await askQuestion(query, mode);
+
+			if (answer.sessionId) {
+				prependQuerySession({
+					id: answer.sessionId,
+					query,
+					answer: answer.answer,
+				});
+			}
 		} catch (error) {
+			answer = null;
 			errorMessage = getApiErrorMessage(error, "Не удалось получить ответ от базы знаний.");
 		} finally {
 			isLoading = false;
@@ -36,35 +42,56 @@
 	}
 
 	function handleKeyDown(event: KeyboardEvent) {
-		if (event.key === "Enter" && (!event.metaKey && !event.ctrlKey)) {
+		if (event.key === "Enter" && !event.shiftKey && !event.metaKey && !event.ctrlKey) {
 			event.preventDefault();
 			void handleSubmit();
 		}
 	}
 </script>
 
-<main class="flex flex-1 items-center justify-center px-4 pb-10 pt-4 md:px-8">
-	<section class="flex w-full max-w-4xl flex-col items-center gap-8">
-		<div class="space-y-3 text-center">
-			<p class="text-muted-foreground text-sm tracking-[0.24em] uppercase">Поиск по базе знаний</p>
-			<h1 class="text-foreground text-3xl font-semibold tracking-tight md:text-5xl">
-				Что у вас сегодня на уме?
-			</h1>
+<main class="flex flex-1 px-4 pb-6 pt-2 md:px-8 md:pb-8">
+	<section class="mx-auto flex w-full max-w-5xl flex-1 flex-col">
+		<div class="flex flex-1 flex-col gap-6">
+			{#if answer}
+				<div class="bg-card/90 flex-1 rounded-[2rem] border border-border/60 px-5 py-6 shadow-[0_24px_80px_-32px_rgba(0,0,0,0.45)] backdrop-blur md:px-8 md:py-8">
+					<div class="mb-6 flex items-center justify-between gap-3 border-b border-border/60 pb-4">
+						<div>
+							<p class="text-sm font-medium text-foreground">Ответ базы знаний</p>
+							<p class="text-muted-foreground text-sm">Одноразовый запрос с сохранением сессии</p>
+						</div>
+						<span class="rounded-full border border-border/60 bg-muted px-2.5 py-1 text-xs text-muted-foreground">{answer.mode}</span>
+					</div>
+					<MarkdownRenderer markdown={answer.answer} />
+				</div>
+			{:else}
+				<div class="flex flex-1 items-center justify-center rounded-[2rem] px-6 py-16 text-center shadow-[0_24px_80px_-32px_rgba(0,0,0,0.35)] backdrop-blur">
+					<div class="max-w-2xl space-y-4">
+						<p class="text-muted-foreground text-sm tracking-[0.24em] uppercase">Поиск по базе знаний</p>
+						<h1 class="text-foreground text-3xl font-semibold tracking-tight md:text-5xl">
+							Что у вас сегодня на уме?
+						</h1>
+					</div>
+				</div>
+			{/if}
+
+			{#if errorMessage}
+				<div class="w-full rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+					{errorMessage}
+				</div>
+			{/if}
 		</div>
 
-		<div class="bg-card/90 w-full rounded-[2rem] border border-border/60 shadow-[0_24px_80px_-32px_rgba(0,0,0,0.45)] backdrop-blur">
-			<div class="border-border/60 bg-background/70 flex min-h-36 flex-col rounded-[1.5rem] border px-4 py-5 md:px-6 md:py-6">
-				<div class="mb-6">
-					<textarea
-						bind:value={prompt}
-						onkeydown={handleKeyDown}
-						rows="4"
-						placeholder="Какие способы закачки шахтных вод в глубокие горизонты применялись в России и за рубежом, и каковы их технико-экономические показатели?"
-						class="text-foreground placeholder:text-muted-foreground field-sizing-content min-h-28 w-full resize-none border-0 bg-transparent px-0 py-0 text-base leading-7 shadow-none outline-none focus-visible:border-0 focus-visible:ring-0 md:text-lg"
-					></textarea>
-				</div>
+		<div class="sticky bottom-0 pt-6">
+			<div class="border-border/60 bg-background/80 rounded-[1.5rem] border px-4 py-4 md:px-5">
+				<textarea
+					bind:value={prompt}
+					onkeydown={handleKeyDown}
+					rows="3"
+					placeholder="Какие способы закачки шахтных вод в глубокие горизонты применялись в России и за рубежом, и каковы их технико-экономические показатели?"
+					class="text-foreground placeholder:text-muted-foreground field-sizing-content min-h-24 w-full resize-none border-0 bg-transparent px-0 py-0 text-base leading-7 shadow-none outline-none focus-visible:border-0 focus-visible:ring-0 md:text-lg"
+				></textarea>
 
-				<div class="mt-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between md:gap-6">
+				<div class="mt-4 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
 					<div class="flex flex-wrap gap-3">
 						<button
 							type="button"
@@ -96,25 +123,5 @@
 				</div>
 			</div>
 		</div>
-
-		{#if errorMessage}
-			<div class="w-full rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-				{errorMessage}
-			</div>
-		{/if}
-
-		{#if answer}
-			<div class="w-full rounded-[2rem] border border-border/60 bg-card/90 p-6 shadow-[0_24px_80px_-32px_rgba(0,0,0,0.45)] backdrop-blur">
-				<div class="mb-4 flex items-center justify-between">
-					<p class="text-sm font-medium text-muted-foreground">Ответ базы знаний</p>
-					<span class="rounded-full bg-muted px-2 py-1 text-xs text-muted-foreground">{answer.mode}</span>
-				</div>
-				<div class="prose prose-invert max-w-none">
-					{#each answer.answer.split("\n") as line, index (index)}
-						<p class="mb-2 text-base leading-7">{line}</p>
-					{/each}
-				</div>
-			</div>
-		{/if}
 	</section>
 </main>

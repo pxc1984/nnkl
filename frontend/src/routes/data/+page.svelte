@@ -18,7 +18,7 @@
 	} from "@tanstack/table-core";
 	import { getCoreRowModel } from "@tanstack/table-core";
 	import type { KnowledgeObject, PaginationMeta } from "$lib/data/types";
-	import { formatBytes, formatDateTime, getObjectTitle, getObjectTypeLabel } from "$lib/data/utils";
+	import { formatBytes, formatDateTime, getObjectTitle } from "$lib/data/utils";
 	import ChevronLeftIcon from "@lucide/svelte/icons/chevron-left";
 	import ChevronRightIcon from "@lucide/svelte/icons/chevron-right";
 	import { cn } from "$lib/utils.js";
@@ -76,13 +76,6 @@
 		const { title } = getTitle();
 		return {
 			render: () => `<span class="font-medium block truncate">${title}</span>`,
-		};
-	});
-
-	const typeSnippet = createRawSnippet<[{ type: string }]>((getType) => {
-		const { type } = getType();
-		return {
-			render: () => `<span class="text-muted-foreground">${type}</span>`,
 		};
 	});
 

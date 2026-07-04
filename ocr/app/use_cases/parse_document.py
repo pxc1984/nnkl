@@ -5,11 +5,10 @@ from __future__ import annotations
 import shutil
 import tempfile
 import uuid
-from pathlib import Path
 from hashlib import sha256
+from pathlib import Path
 
 import structlog
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.schemas import ParseRequest, TaskStatus
@@ -162,13 +161,39 @@ def _parse_input_document(
     return content, None
 
 
-def _pack_assets(image_dir: Path | None) -> bytes | None:
-    if image_dir is None or not image_dir.exists() or not any(image_dir.iterdir()):
-        return None
+def _get_or_create_blob(
+    session: Session,
+    *,
+    filename: str,
+    file_type: str,
+    content_type: str,
+    content: bytes,
+) -> Blob:
+    content_hash = sha256(content).hexdigest()
 
-    buffer = BytesIO()
-    with zipfile.ZipFile(buffer, mode="w", compression=zipfile.ZIP_DEFLATED) as archive:
-        for path in sorted(image_dir.rglob("*")):
-            if path.is_file():
-                archive.write(path, arcname=path.relative_to(image_dir))
-    return buffer.getvalue()
+    existing_blob = (
+        session.query(Blob)
+        .filter(
+            Blob.sha256 == content_hash,
+            Blob.filename == filename,
+            Blob.file_type == file_type,
+            Blob.content_type == content_type,
+            Blob.size_bytes == len(content),
+        )
+        .one_or_none()
+    )
+    if existing_blob is not None:
+        return existing_blob
+
+    blob = Blob(
+        id=uuid.uuid4(),
+        filename=filename,
+        file_type=file_type,
+        content_type=content_type,
+        size_bytes=len(content),
+        sha256=content_hash,
+        content=content,
+    )
+    session.add(blob)
+    session.flush()
+    return blob

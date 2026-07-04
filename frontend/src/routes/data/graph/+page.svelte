@@ -2,7 +2,7 @@
     import {Button} from "$lib/components/ui/button/index.js";
     import {Input} from "$lib/components/ui/input/index.js";
     import GraphViewer from "$lib/components/graph/GraphViewer.svelte";
-    import {type GraphData, type GraphNode, type GraphNodeType, mockGraph, NODE_COLORS} from "$lib/data/graph";
+    import {type GraphData, type GraphNode, type GraphNodeType, NODE_COLORS} from "$lib/data/graph";
     import {queryKnowledgeGraph} from "$lib/api/data";
     import {SearchIcon, XIcon} from "@lucide/svelte";
     import {getApiErrorMessage} from "$lib/api/auth";
@@ -10,7 +10,7 @@
     let query = $state("");
     let isLoading = $state(false);
     let errorMessage = $state("");
-    let graphData = $state<GraphData>(mockGraph);
+    let graphData = $state<GraphData>({nodes: [], edges: []});
 
     let selectedNode = $state<GraphNode | null>(null);
 
@@ -45,19 +45,14 @@
 </svelte:head>
 
 <main class="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl">
-    <div class="border-border/60 bg-background/70 z-10 flex flex-col gap-4 border-b px-6 py-4 md:flex-row md:items-center md:justify-between">
-        <div>
-            <h1 class="text-lg font-semibold">Карта знаний</h1>
-            <p class="text-muted-foreground text-sm">Введите тему, чтобы построить подграф из LightRAG.</p>
-        </div>
-
-        <form class="flex gap-2" onsubmit={handleSubmit}>
-            <div class="relative">
+    <div class="border-border/60 bg-background/70 z-10 flex flex-col gap-4 border-b px-6 py-4 md:flex-row md:items-center md:justify-between w-full">
+        <form class="flex gap-2 w-full" onsubmit={handleSubmit}>
+            <div class="relative w-full">
                 <SearchIcon class="text-muted-foreground pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2" />
                 <Input
                     bind:value={query}
                     placeholder="Например: никель, электроэкстракция"
-                    class="h-10 rounded-full pl-9 md:w-80"
+                    class="h-10 rounded-full pl-9 w-full"
                     disabled={isLoading}
                 />
             </div>

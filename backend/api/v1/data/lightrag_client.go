@@ -130,6 +130,7 @@ func (c *LightRAGClient) QueryStream(ctx context.Context, query, mode string) (*
 	}
 	return resp, nil
 }
+
 func (c *LightRAGClient) Health(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()

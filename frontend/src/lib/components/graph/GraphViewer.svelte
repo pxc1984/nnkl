@@ -112,4 +112,4 @@
   });
 </script>
 
-<div bind:this={container} class="h-full w-full rounded-lg border bg-card"></div>
+<div bind:this={container} class="h-full w-full bg-background"></div>

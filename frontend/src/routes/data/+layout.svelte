@@ -23,12 +23,18 @@
 			return [{ label: "Материалы", href: "/data" }, { label: "Поиск" }] as BCItem[];
 		}
 
+		if (path.startsWith("/data/graph")) {
+			return [{ label: "Карта знаний", href: "/data/graph" }] as BCItem[];
+		}
+
 		if (path.startsWith("/data/")) {
 			return [{ label: "Материалы", href: "/data" }, { label: "Документ" }] as BCItem[];
 		}
 
 		return [{ label: "Материалы" }] as BCItem[];
 	});
+
+	const isGraphRoute = $derived(page.url.pathname.startsWith("/data/graph"));
 
 	let { children }: { children: Snippet } = $props();
 </script>
@@ -60,7 +66,7 @@
 				</Breadcrumb.Root>
 			</div>
 		</header>
-		<main class="flex flex-1 flex-col px-4 md:px-8">
+		<main class={`flex min-h-0 flex-1 flex-col ${isGraphRoute ? "px-0" : "px-4 md:px-8"}`}>
 			{@render children()}
 		</main>
 	</Sidebar.Inset>

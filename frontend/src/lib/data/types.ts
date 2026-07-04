@@ -17,11 +17,8 @@ export type KnowledgeObject = {
   id: string;
   filename: string;
   originalFilename?: string;
-  type?: string;
   mimeType?: string;
-  contentType?: string;
   size?: number;
-  sizeBytes?: number;
   status: KnowledgeObjectStatus;
   errorMessage?: string | null;
   createdAt: string;
@@ -30,10 +27,6 @@ export type KnowledgeObject = {
   metadata?: Record<string, unknown>;
   tags?: string[];
   title?: string;
-  sha256?: string;
-  hasContent?: boolean;
-  hasResult?: boolean;
-  language?: string | null;
 };
 
 export type KnowledgeObjectDetails = KnowledgeObject & {

@@ -69,6 +69,9 @@ func (a *DataAPI) ask(c *gin.Context) {
 		processedReferences = resp.References
 	}
 
+	// Заменяем UUID.md в тексте ответа на реальные имена файлов.
+	enrichedResponse := EnrichResponseReferences(resp.Response, processedReferences)
+
 	// Persist query session
 	user, _ := api.CurrentUserFromContext(c)
 	var session *models.QuerySession
@@ -77,7 +80,7 @@ func (a *DataAPI) ask(c *gin.Context) {
 			UserID:     user.ID,
 			Query:      req.Query,
 			Mode:       req.Mode,
-			Response:   resp.Response,
+			Response:   enrichedResponse,
 			References: processedReferences,
 		})
 		if err != nil {
@@ -87,7 +90,7 @@ func (a *DataAPI) ask(c *gin.Context) {
 	}
 
 	askResp := AskResponse{
-		Answer: resp.Response,
+		Answer: enrichedResponse,
 		Mode:   req.Mode,
 	}
 	if session != nil {

@@ -1,6 +1,7 @@
 package data
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 )
@@ -87,5 +88,29 @@ func TestEnhanceQueryWithoutConstraints(t *testing.T) {
 	enhanced := enhanceQueryWithNumericConstraints(query)
 	if enhanced != query {
 		t.Errorf("expected unchanged query, got:\n%s", enhanced)
+	}
+}
+
+func TestEnrichResponseReferences(t *testing.T) {
+	refs := json.RawMessage(`[
+		{"id": "14bd1a61-3a2f-4936-a2bd-00c5266ac123", "filename": "Bindura_2010.pdf", "type": "pdf", "createdAt": "2026-01-01T00:00:00Z"},
+		{"id": "aea34f4a-afb9-40bf-8db4-0fb0391bfccf", "filename": "Cunico Resources.pdf", "type": "pdf", "createdAt": "2026-01-01T00:00:00Z"}
+	]`)
+
+	response := "## References\n- [1] 14bd1a61-3a2f-4936-a2bd-00c5266ac123.md\n- [3] aea34f4a-afb9-40bf-8db4-0fb0391bfccf.md\n\nSome text with 14bd1a61-3a2f-4936-a2bd-00c5266ac123."
+
+	enriched := EnrichResponseReferences(response, refs)
+
+	if strings.Contains(enriched, "14bd1a61-3a2f-4936-a2bd-00c5266ac123.md") {
+		t.Error("uuid.md should be replaced with filename")
+	}
+	if strings.Contains(enriched, "14bd1a61-3a2f-4936-a2bd-00c5266ac123") {
+		t.Error("plain uuid should also be replaced with filename")
+	}
+	if !strings.Contains(enriched, "Bindura_2010.pdf") {
+		t.Error("filename should appear in response")
+	}
+	if !strings.Contains(enriched, "Cunico Resources.pdf") {
+		t.Error("second filename should appear in response")
 	}
 }

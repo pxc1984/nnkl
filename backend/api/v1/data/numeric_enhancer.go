@@ -1,6 +1,7 @@
 package data
 
 import (
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -167,6 +168,29 @@ func inferProperty(query, matched string) string {
 		}
 	}
 	return "значение"
+}
+
+// EnrichResponseReferences заменяет UUID источников в тексте ответа LightRAG
+// на реальные имена файлов, используя обогащённые references.
+func EnrichResponseReferences(response string, refs json.RawMessage) string {
+	if len(refs) == 0 {
+		return response
+	}
+
+	var enriched []EnrichedReference
+	if err := json.Unmarshal(refs, &enriched); err != nil {
+		return response
+	}
+
+	for _, ref := range enriched {
+		if ref.Filename == "" {
+			continue
+		}
+		response = strings.ReplaceAll(response, ref.ID+".md", ref.Filename)
+		response = strings.ReplaceAll(response, ref.ID, ref.Filename)
+	}
+
+	return response
 }
 
 func cleanProperty(s string) string {

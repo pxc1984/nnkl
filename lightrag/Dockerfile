@@ -13,6 +13,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --upgrade pip && pip install -r requirements.txt
 
+COPY patch_postgres_table_names.py .
+RUN python patch_postgres_table_names.py && rm patch_postgres_table_names.py
+
 RUN mkdir -p /app/data/rag_storage /app/data/inputs /app/data/prompts
 
 EXPOSE 9621

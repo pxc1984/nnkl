@@ -8,8 +8,8 @@ cp .env.example .env
 
 Обязательные ключи:
 
-- `LIGHTRAG_LLM_BINDING_API_KEY` — Cerebras API;
-- `LIGHTRAG_EMBEDDING_BINDING_API_KEY` — Jina AI API.
+- `LIGHTRAG_LLM_BINDING_API_KEY` — Yandex AI Studio API;
+- `LIGHTRAG_EMBEDDING_BINDING_API_KEY` — Yandex AI Studio API (можно использовать тот же ключ).
 
 ```bash
 docker compose up --build

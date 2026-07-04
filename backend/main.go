@@ -65,6 +65,9 @@ func main() {
 	<-quit
 	slog.Info("shutting down server...")
 
+	// Stop background workers before the server.
+	apiv1.StopDataQueue()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 

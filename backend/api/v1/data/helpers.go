@@ -20,42 +20,26 @@ import (
 	"gorm.io/gorm"
 )
 
-func (a *DataAPI) reprocessBlob(c *gin.Context, blobID, outputFormat, language string) error {
-	upload, err := a.store.GetUploadByID(c.Request.Context(), blobID)
+func (a *DataAPI) finalizeMarkdown(c *gin.Context, uploadID, language, outputFormat string) {
+	upload, err := a.store.GetUploadByID(c.Request.Context(), uploadID)
 	if err != nil {
-		api.RespondError(c, http.StatusInternalServerError, "failed to load upload", "internal_error")
-		return err
+		slog.Error("finalize markdown: failed to load upload", "upload_id", uploadID, "error", err)
+		return
 	}
-	if isMarkdownBlob(&upload.InputBlob) {
-		status := "completed"
-		outputBlobID := upload.InputBlobID
-		if _, err := a.store.UpdateUpload(c.Request.Context(), upload.ID, models.UpdateUploadParams{
-			OutputBlobID: &outputBlobID,
-			Status:       &status,
-			Language:     &language,
-			Error:        stringPtr(""),
-		}); err != nil {
-			api.RespondError(c, http.StatusInternalServerError, "failed to finalize markdown upload", "internal_error")
-			return err
-		}
-		if outputFormat == "markdown" && a.lightrag != nil && a.lightrag.IsConfigured() {
-			a.sendToLightRAG(c, blobID, outputFormat)
-		}
-		return nil
-	}
-	if err := a.ocr.Parse(c.Request.Context(), OCRParseRequest{
-		UploadID:    blobID,
-		InputBlobID: upload.InputBlobID,
-		Language:    language,
+	status := "completed"
+	outputBlobID := upload.InputBlobID
+	if _, err := a.store.UpdateUpload(c.Request.Context(), upload.ID, models.UpdateUploadParams{
+		OutputBlobID: &outputBlobID,
+		Status:       &status,
+		Language:     &language,
+		Error:        stringPtr(""),
 	}); err != nil {
-		api.RespondError(c, http.StatusBadGateway, fmt.Sprintf("ocr parse failed: %v", err), "ocr_error")
-		return err
+		slog.Error("finalize markdown: failed to finalize", "upload_id", uploadID, "error", err)
+		return
 	}
-
 	if outputFormat == "markdown" && a.lightrag != nil && a.lightrag.IsConfigured() {
-		a.sendToLightRAG(c, blobID, outputFormat)
+		a.sendToLightRAG(c, uploadID, outputFormat)
 	}
-	return nil
 }
 
 func (a *DataAPI) sendToLightRAG(c *gin.Context, blobID, outputFormat string) {

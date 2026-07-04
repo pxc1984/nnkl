@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/pxc1984/nnkl-backend/api"
 	"github.com/pxc1984/nnkl-backend/store/models"
+	"github.com/pxc1984/nnkl-backend/worker"
 	"gorm.io/gorm"
 )
 
@@ -62,8 +63,21 @@ func (a *DataAPI) upload(c *gin.Context) {
 			return
 		}
 
-		if err := a.reprocessBlob(c, upload.ID, defaultString(params.OutputFormat, "markdown"), defaultString(params.Language, "auto")); err != nil {
-			return
+		// Enqueue for background processing instead of blocking on OCR/extraction.
+		job := worker.Job{
+			UploadID:     upload.ID,
+			OutputFormat: defaultString(params.OutputFormat, "markdown"),
+			Language:     defaultString(params.Language, "auto"),
+			FileType:     blob.FileType,
+		}
+		switch blob.FileType {
+		case "docx", "pptx":
+			a.queue.EnqueueSimple(job)
+		case "pdf":
+			a.queue.EnqueueOCR(job)
+		case "markdown":
+			// Markdown is already text — finalize inline so the response is immediate.
+			a.finalizeMarkdown(c, upload.ID, job.Language, job.OutputFormat)
 		}
 
 		response.Items = append(response.Items, DataUploadItem{

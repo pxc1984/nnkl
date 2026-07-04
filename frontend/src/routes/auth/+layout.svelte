@@ -1,5 +1,6 @@
 <script>
     import RandomMainPageImage from "$lib/components/RandomMainPageImage.svelte";
+    let { children } = $props();
 </script>
 
 <div class="grid min-h-svh lg:grid-cols-2">
@@ -13,7 +14,7 @@
         </div>
         <div class="flex flex-1 items-center justify-center">
             <div class="w-full max-w-xs">
-                <slot />
+                {@render children()}
             </div>
         </div>
     </div>

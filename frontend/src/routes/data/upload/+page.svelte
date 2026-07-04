@@ -5,7 +5,6 @@
 	import { getApiErrorMessage } from "$lib/api/auth";
 	import { uploadKnowledgeObjects } from "$lib/api/data";
 	import { formatBytes } from "$lib/data/utils";
-    import { UploadIcon } from "@lucide/svelte";
 
 	type UploadStatus = "idle" | "uploading" | "success" | "error";
 
@@ -413,14 +412,14 @@
 	/>
 
 	{#if uploadError}
-		<div class="text-destructive bg-destructive/10 rounded-2xl border border-destructive/20 px-4 py-3 text-sm">
+		<div class="text-sm text-destructive">
 			{uploadError}
 		</div>
 	{/if}
 
 	{#if entries.length === 0}
 		<div
-			class="flex flex-1 items-center justify-center px-4 {isBusy ? 'cursor-default' : 'cursor-pointer'}"
+			class="flex flex-1 items-center justify-center px-4 py-20 {isBusy ? 'cursor-default' : 'cursor-pointer'}"
 			onclick={openFileDialog}
 			role="button"
 			tabindex="0"
@@ -436,8 +435,7 @@
 					<p class="text-muted-foreground text-sm">{filePreparationProgress}%</p>
 				</div>
 			{:else}
-				<div class="text-muted-foreground flex flex-col items-center gap-4 text-center">
-					<UploadIcon class="size-16 opacity-40" />
+				<div class="text-muted-foreground flex flex-col items-center gap-3 text-center">
 					<p class="text-lg">Нажмите чтобы выбрать файлы или перетащите их сюда</p>
 					<p class="text-sm">PDF, DOCX, PPTX, а также ZIP-архивы</p>
 				</div>

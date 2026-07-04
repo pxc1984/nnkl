@@ -139,7 +139,7 @@
 					<MarkdownRenderer markdown={answer.answer} />
 
 					{#if getDocumentLinks().length > 0}
-						<div class="mt-10 border-t border-border/20 pt-6">
+						<div class="mt-10 pt-6">
 							<h3 class="mb-3 text-sm font-medium text-muted-foreground">
 								Источники
 							</h3>
@@ -149,7 +149,7 @@
 									<button
 											type="button"
 											onclick={() => goToDocument(ref.id)}
-											class="inline-flex items-center gap-2 rounded-full border border-border/30 bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted"
+											class="inline-flex items-center gap-2 rounded-full border border-border/15 bg-muted/20 px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted/40"
 									>
 										<FileTextIcon class="size-3.5" />
 										<span class="truncate">
@@ -182,14 +182,14 @@
 			{/if}
 
 			{#if errorMessage}
-				<div class="mt-6 rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+				<div class="mt-6 text-sm text-destructive">
 					{errorMessage}
 				</div>
 			{/if}
 		</div>
 
 		<div class="sticky bottom-4 mt-8">
-			<div class="rounded-3xl border border-border/20 bg-background px-5 py-4 shadow-sm">
+			<div class="rounded-2xl border border-border/15 bg-muted/20 px-5 py-4">
 				<textarea
 						bind:value={prompt}
 						onkeydown={handleKeyDown}
@@ -202,8 +202,8 @@
 					<button
 							type="button"
 							class={useDomesticSources
-							? "inline-flex items-center gap-2 rounded-full bg-foreground px-3 py-2 text-sm text-background transition-colors"
-							: "inline-flex items-center gap-2 rounded-full bg-muted px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/80"}
+							? "inline-flex items-center gap-2 rounded-full bg-foreground/10 px-3 py-2 text-sm text-foreground transition-colors"
+							: "inline-flex items-center gap-2 rounded-full bg-muted/30 px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/50"}
 							onclick={() => (useDomesticSources = !useDomesticSources)}
 					>
 						<GlobeIcon class="size-4" />

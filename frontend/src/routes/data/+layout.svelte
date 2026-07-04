@@ -6,9 +6,8 @@
 	import { setQuerySessions } from "$lib/ask/query-sessions";
 	import { authState } from "$lib/auth/store";
 	import AppSidebar from "$lib/components/app-sidebar.svelte";
-	import * as Breadcrumb from "$lib/components/ui/breadcrumb/index.js";
-	import { Separator } from "$lib/components/ui/separator/index.js";
-	import * as Sidebar from "$lib/components/ui/sidebar/index.js";
+import * as Breadcrumb from "$lib/components/ui/breadcrumb/index.js";
+import * as Sidebar from "$lib/components/ui/sidebar/index.js";
 
 	type BCItem = { label: string; href?: string };
 
@@ -64,11 +63,10 @@
 	<AppSidebar currentUser={$authState.user} />
 	<Sidebar.Inset class="bg-background min-h-svh md:min-h-[calc(100svh-1rem)]">
 		<header
-			class="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12"
+			class="flex h-14 shrink-0 items-center transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12"
 		>
-			<div class="flex items-center gap-2 px-4">
+			<div class="flex items-center px-4">
 				<Sidebar.Trigger class="-ms-1" />
-				<Separator orientation="vertical" class="me-2 data-[orientation=vertical]:h-4" />
 				<Breadcrumb.Root>
 					<Breadcrumb.List>
 						{#each breadcrumbs as item, index (item.label)}
@@ -87,7 +85,7 @@
 				</Breadcrumb.Root>
 			</div>
 		</header>
-		<main class={`flex min-h-0 flex-1 flex-col ${isGraphRoute ? "px-0" : "px-4 md:px-8"}`}>
+		<main class={`flex min-h-0 flex-1 flex-col ${isGraphRoute ? "px-0" : "px-6 pb-8 pt-2 md:px-10"}`}>
 			{@render children()}
 		</main>
 	</Sidebar.Inset>

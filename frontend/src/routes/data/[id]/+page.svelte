@@ -13,7 +13,6 @@
         formatDateTime,
         getMetadataEntries,
         getObjectTitle,
-        getObjectTypeLabel,
     } from "$lib/data/utils";
     import type {KnowledgeObjectDetails} from "$lib/data/types";
     import { ChevronLeftIcon, DownloadIcon, FileSearchIcon, LoaderIcon } from "@lucide/svelte";
@@ -112,7 +111,7 @@
     });
 </script>
 
-<div class="mx-auto flex w-full max-w-6xl flex-col py-4">
+<div class="mx-auto flex w-full max-w-4xl flex-col py-6">
 
     <div class="mb-10 flex items-center justify-between">
         <Button href={resolve("/data")} variant="ghost">
@@ -151,141 +150,118 @@
     </div>
 
     {#if errorMessage && !object}
-        <div class="rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+        <div class="text-sm text-destructive">
             {errorMessage}
         </div>
     {:else if object}
-        <div class="grid gap-14 lg:grid-cols-[minmax(0,1fr)_18rem]">
+        <div class="space-y-14">
 
-            <div class="space-y-14">
+            <section>
+                <div class="mb-4 flex flex-wrap items-center gap-3">
+                    <h1 class="text-3xl font-semibold tracking-tight">
+                        {getObjectTitle(object)}
+                    </h1>
 
-                <section>
-                    <div class="mb-6 flex flex-wrap items-center gap-3">
-                        <h1 class="text-3xl font-semibold tracking-tight">
-                            {getObjectTitle(object)}
-                        </h1>
+                    <DataStatusBadge status={object.status}/>
+                </div>
 
-                        <DataStatusBadge status={object.status}/>
-                        <Badge variant="outline">{getObjectTypeLabel(object)}</Badge>
-                    </div>
-
-                    {#if object.errorMessage}
-                        <p class="mb-6 text-sm text-destructive">
-                            {object.errorMessage}
-                        </p>
-                    {/if}
-
-                    {#if object.tags?.length}
-                        <div class="mb-8 flex flex-wrap gap-2">
-                            {#each object.tags as tag (tag)}
-                                <Badge variant="secondary">{tag}</Badge>
-                            {/each}
-                        </div>
-                    {/if}
-
-                    <div class="grid gap-6 sm:grid-cols-3 text-sm">
-                        <div>
-                            <div class="text-muted-foreground">
-                                Размер
-                            </div>
-
-                            <div>{formatBytes(object.size)}</div>
-                        </div>
-
-                        <div>
-                            <div class="text-muted-foreground">
-                                Создан
-                            </div>
-
-                            <div>{formatDateTime(object.createdAt)}</div>
-                        </div>
-
-                        <div>
-                            <div class="text-muted-foreground">
-                                Обновлён
-                            </div>
-
-                            <div>{formatDateTime(object.updatedAt)}</div>
-                        </div>
-                    </div>
-                </section>
-
-                <section>
-                    <div class="mb-8 flex items-center justify-between">
-                        <h2 class="text-xl font-medium">
-                            Markdown
-                        </h2>
-
-                        {#if object.outputFormat}
-                            <div class="text-sm text-muted-foreground">
-                                {object.outputFormat}
-                            </div>
-                        {/if}
-                    </div>
-
-                    {#if hasMarkdownContent}
-                        <MarkdownRenderer markdown={object.content ?? ""}/>
-                    {:else}
-                        <p class="text-muted-foreground">
-                            Отпаршенный markdown пока недоступен.
-                        </p>
-                    {/if}
-                </section>
-
-                {#if metadataEntries.length}
-                    <section>
-                        <h2 class="mb-6 text-xl font-medium">
-                            Дополнительные метаданные
-                        </h2>
-
-                        <div class="grid gap-5 sm:grid-cols-2">
-                            {#each metadataEntries as [key, value] (key)}
-                                <div>
-                                    <div class="text-xs uppercase text-muted-foreground">
-                                        {key}
-                                    </div>
-
-                                    <div class="mt-1 break-words">
-                                        {value}
-                                    </div>
-                                </div>
-                            {/each}
-                        </div>
-                    </section>
+                {#if object.errorMessage}
+                    <p class="mb-4 text-sm text-destructive">
+                        {object.errorMessage}
+                    </p>
                 {/if}
 
-            </div>
+                {#if object.tags?.length}
+                    <div class="mb-6 flex flex-wrap gap-2">
+                        {#each object.tags as tag (tag)}
+                            <Badge variant="secondary">{tag}</Badge>
+                        {/each}
+                    </div>
+                {/if}
 
-            <aside class="h-fit rounded-2xl border border-border/20 bg-muted/20 p-5">
-                <h2 class="mb-6 font-medium">
+                <div class="flex flex-wrap gap-x-8 gap-y-2 text-sm text-muted-foreground">
+                    <div>
+                        {formatBytes(object.size)}
+                    </div>
+
+                    <div>
+                        Создан {formatDateTime(object.createdAt)}
+                    </div>
+
+                    <div>
+                        Обновлён {formatDateTime(object.updatedAt)}
+                    </div>
+
+                    {#if object.outputFormat}
+                        <div>
+                            {object.outputFormat}
+                        </div>
+                    {/if}
+                </div>
+            </section>
+
+            <section>
+                {#if hasMarkdownContent}
+                    <MarkdownRenderer markdown={object.content ?? ""}/>
+                {:else}
+                    <p class="text-muted-foreground">
+                        Отпаршенный markdown пока недоступен.
+                    </p>
+                {/if}
+            </section>
+
+            {#if metadataEntries.length}
+                <section class="rounded-2xl border border-border/20 bg-muted/20 p-5">
+                    <h2 class="mb-4 text-sm font-medium text-muted-foreground">
+                        Дополнительные метаданные
+                    </h2>
+
+                    <div class="grid gap-4 sm:grid-cols-2 text-sm">
+                        {#each metadataEntries as [key, value] (key)}
+                            <div>
+                                <div class="text-xs text-muted-foreground">
+                                    {key}
+                                </div>
+
+                                <div class="mt-0.5 break-words">
+                                    {value}
+                                </div>
+                            </div>
+                        {/each}
+                    </div>
+                </section>
+            {/if}
+
+            <aside class="rounded-2xl border border-border/20 bg-muted/20 p-5">
+                <h2 class="mb-4 text-sm font-medium text-muted-foreground">
                     Системные поля
                 </h2>
 
-                <dl class="space-y-5 text-sm">
+                <dl class="space-y-4 text-sm">
 
                     <div>
-                        <dt class="text-muted-foreground">ID</dt>
-                        <dd class="mt-1 font-mono text-xs break-all">{object.id}</dd>
+                        <dt class="text-muted-foreground text-xs">ID</dt>
+                        <dd class="mt-0.5 font-mono text-xs break-all">{object.id}</dd>
                     </div>
 
                     <div>
-                        <dt class="text-muted-foreground">Имя файла</dt>
-                        <dd class="mt-1">{object.originalFilename || object.filename}</dd>
+                        <dt class="text-muted-foreground text-xs">Имя файла</dt>
+                        <dd class="mt-0.5">{object.originalFilename || object.filename}</dd>
                     </div>
 
                     <div>
-                        <dt class="text-muted-foreground">Тип</dt>
-                        <dd class="mt-1">{object.type || "-"}</dd>
+                        <dt class="text-muted-foreground text-xs">Тип</dt>
+                        <dd class="mt-0.5">{object.type || "-"}</dd>
                     </div>
 
                     <div>
-                        <dt class="text-muted-foreground">Content-Type</dt>
-                        <dd class="mt-1 break-all">{object.contentType || object.mimeType || "-"}</dd>
+                        <dt class="text-muted-foreground text-xs">Content-Type</dt>
+                        <dd class="mt-0.5 break-all">{object.contentType || object.mimeType || "-"}</dd>
                     </div>
 
                     <div>
-                        <dt class="text-muted-foreground">SHA-256</dt>
-                        <dd class="mt-1 font-mono text-xs break-all">{object.sha256 || "-"}</dd>
+                        <dt class="text-muted-foreground text-xs">SHA-256</dt>
+                        <dd class="mt-0.5 font-mono text-xs break-all">{object.sha256 || "-"}</dd>
                     </div>
 
                 </dl>

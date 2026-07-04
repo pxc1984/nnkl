@@ -20,10 +20,9 @@
 	import { getCoreRowModel } from "@tanstack/table-core";
 	import type { KnowledgeObject, PaginationMeta } from "$lib/data/types";
 	import { formatBytes, formatDateTime, getObjectTitle } from "$lib/data/utils";
-	import ChevronLeftIcon from "@lucide/svelte/icons/chevron-left";
-	import ChevronRightIcon from "@lucide/svelte/icons/chevron-right";
 	import { cn } from "$lib/utils.js";
 	import { createRawSnippet } from "svelte";
+    import { ChevronLeftIcon, ChevronRightIcon } from "@lucide/svelte";
 
 	const PAGE_SIZE = 20;
 
@@ -217,81 +216,83 @@
 	});
 </script>
 
-<div class="flex flex-col justify-between h-full">
+<div class="flex flex-col gap-8 py-6">
 	{#if errorMessage}
-		<div class="text-destructive bg-destructive/10 rounded-2xl border border-destructive/20 px-4 py-3 text-sm">
+		<div class="text-sm text-destructive">
 			{errorMessage}
 		</div>
 	{/if}
 
 	{#if isLoading}
-		<div class="rounded-md border p-6">
-			{#each [1, 2, 3, 4, 5, 6] as i (i)}
-				<div class="flex items-center gap-4 py-3">
-					<Skeleton class="h-5 w-48 rounded-full" />
-					<Skeleton class="h-5 w-20 rounded-full" />
-					<Skeleton class="h-5 w-16 rounded-full" />
-					<Skeleton class="h-5 w-20 rounded-full" />
-					<Skeleton class="h-5 w-32 rounded-full" />
-					<Skeleton class="h-5 w-28 rounded-full" />
-					<Skeleton class="ms-auto h-8 w-24 rounded-full" />
+		<div>
+			<div class="flex items-center gap-4 border-b border-border/10 pb-3">
+				<Skeleton class="h-5 w-48" />
+				<Skeleton class="h-5 w-20" />
+				<Skeleton class="h-5 w-16" />
+				<Skeleton class="h-5 w-20" />
+				<Skeleton class="ms-auto h-8 w-24" />
+			</div>
+			{#each [1, 2, 3, 4, 5] as i (i)}
+				<div class="flex items-center gap-4 border-b border-border/5 py-3">
+					<Skeleton class="h-5 w-48" />
+					<Skeleton class="h-5 w-20" />
+					<Skeleton class="h-5 w-16" />
+					<Skeleton class="h-5 w-20" />
+					<Skeleton class="ms-auto h-8 w-24" />
 				</div>
 			{/each}
 		</div>
 	{:else}
-		<div class="rounded-md border">
-			<Table.Root class="table-fixed">
-				<Table.Header>
-					{#each table.getHeaderGroups() as headerGroup (headerGroup.id)}
-						<Table.Row>
-							{#each headerGroup.headers as header (header.id)}
-								<Table.Head class={cn("has-[[role=checkbox]]:ps-3", header.column.id === "mimeType" && "hidden md:table-cell w-24", header.column.id === "filename" && "w-full min-w-0", header.column.id === "size" && "w-20", header.column.id === "status" && "w-24", header.column.id === "createdAt" && "w-36", header.column.id === "actions" && "w-36")}>
-									{#if !header.isPlaceholder}
-										<FlexRender
-											content={header.column.columnDef.header}
-											context={header.getContext()}
-										/>
-									{/if}
-								</Table.Head>
-							{/each}
-						</Table.Row>
-					{/each}
-				</Table.Header>
-				<Table.Body>
-					{#each table.getRowModel().rows as row (row.id)}
-						<Table.Row>
-							{#each row.getVisibleCells() as cell (cell.id)}
-								<Table.Cell class={cn("has-[[role=checkbox]]:ps-3", cell.column.id === "mimeType" && "hidden md:table-cell", cell.column.id === "filename" && "min-w-0")}>
+		<Table.Root class="table-fixed">
+			<Table.Header>
+				{#each table.getHeaderGroups() as headerGroup (headerGroup.id)}
+					<Table.Row>
+						{#each headerGroup.headers as header (header.id)}
+							<Table.Head class={cn("has-[[role=checkbox]]:ps-3", header.column.id === "mimeType" && "hidden md:table-cell w-24", header.column.id === "filename" && "w-full min-w-0", header.column.id === "size" && "w-20", header.column.id === "status" && "w-24", header.column.id === "createdAt" && "w-36", header.column.id === "actions" && "w-36")}>
+								{#if !header.isPlaceholder}
 									<FlexRender
-										content={cell.column.columnDef.cell}
-										context={cell.getContext()}
+										content={header.column.columnDef.header}
+										context={header.getContext()}
 									/>
-								</Table.Cell>
-							{/each}
-						</Table.Row>
-					{:else}
-						<Table.Row>
-							<Table.Cell colspan={columns.length} class="h-24 text-center">
-								Нет результатов.
+								{/if}
+							</Table.Head>
+						{/each}
+					</Table.Row>
+				{/each}
+			</Table.Header>
+			<Table.Body>
+				{#each table.getRowModel().rows as row (row.id)}
+					<Table.Row>
+						{#each row.getVisibleCells() as cell (cell.id)}
+							<Table.Cell class={cn("has-[[role=checkbox]]:ps-3", cell.column.id === "mimeType" && "hidden md:table-cell", cell.column.id === "filename" && "min-w-0")}>
+								<FlexRender
+									content={cell.column.columnDef.cell}
+									context={cell.getContext()}
+								/>
 							</Table.Cell>
-						</Table.Row>
-					{/each}
-				</Table.Body>
-			</Table.Root>
-		</div>
+						{/each}
+					</Table.Row>
+				{:else}
+					<Table.Row>
+						<Table.Cell colspan={columns.length} class="h-24 text-center">
+							Нет результатов.
+						</Table.Cell>
+					</Table.Row>
+				{/each}
+			</Table.Body>
+		</Table.Root>
 
-		<div class="flex items-center justify-between pt-4 bottom-4">
+		<div class="flex items-center justify-between pt-2">
 			<p class="text-muted-foreground text-sm">
 				{totalItems === 1
 					? "1 материал"
 					: `${totalItems} материалов`}
 			</p>
 
-			<div class="flex items-center gap-2">
+			<div class="flex items-center gap-1">
 				<Button
 					variant="outline"
 					size="sm"
-					class="rounded-full"
 					disabled={!table.getCanPreviousPage()}
 					onclick={() => table.previousPage()}
 				>
@@ -303,9 +304,9 @@
 					return start + i + 1;
 				}) as pageNum (pageNum)}
 					<Button
-						variant={pageNum === currentPage ? "default" : "outline"}
+						variant={pageNum === currentPage ? "default" : "ghost"}
 						size="sm"
-						class="rounded-full min-w-9"
+						class="min-w-9"
 						onclick={() => table.setPageIndex(pageNum - 1)}
 					>
 						{pageNum}
@@ -315,7 +316,6 @@
 				<Button
 					variant="outline"
 					size="sm"
-					class="rounded-full"
 					disabled={!table.getCanNextPage()}
 					onclick={() => table.nextPage()}
 				>

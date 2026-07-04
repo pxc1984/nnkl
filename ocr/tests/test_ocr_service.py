@@ -36,7 +36,7 @@ class TestMarkdownPostprocessor:
 
 
 class TestScanDetection:
-    def test_detect_scan_low_text(self, sample_pdf: Path) -> None:
+    def test_detect_scan_quality(self, sample_pdf: Path) -> None:
         from app.services.ocr_service import _detect_scan_quality
 
         assert _detect_scan_quality(sample_pdf) is False
@@ -83,6 +83,7 @@ class TestPDFQualityRouting:
         source = tmp_path / "source.pdf"
         source.write_bytes(sample_pdf.read_bytes())
         service = OCRService(
+            api_key="fake-key-for-testing",
             preprocess_scans=True,
             scan_dpi=144,
             max_page_megapixels=2,
@@ -107,10 +108,14 @@ class TestConservativeMarkdownCleanup:
         assert "450 МПа" in result
 
 
-class TestMinerULanguageMapping:
-    def test_language_mapping_matches_mineru_cli(self) -> None:
-        from app.services.ocr_service import _MINERU_LANG_MAP
+class TestYandexVisionLanguageMapping:
+    def test_language_mapping_for_yandex_vision(self) -> None:
+        from app.services.ocr_service import OCRService
 
-        assert _MINERU_LANG_MAP["ru"] == "cyrillic"
-        assert _MINERU_LANG_MAP["auto"] == "cyrillic"
-        assert _MINERU_LANG_MAP["en"] == "ch"
+        # Test the language mapping method directly
+        service = OCRService(api_key="fake-key")
+        
+        # Test individual mappings
+        assert service._map_language_for_yandex("ru") == "ru-RU"
+        assert service._map_language_for_yandex("en") == "en-US"
+        assert service._map_language_for_yandex("auto") == "auto"

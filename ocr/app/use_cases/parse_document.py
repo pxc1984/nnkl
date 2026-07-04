@@ -136,13 +136,15 @@ def _parse_input_document(
         logger.info(
             "document_extraction.route_selected",
             path=str(input_path),
-            route="native" if use_native else "mineru",
+            route="native" if use_native else "yandex_vision",
             correlation_id=correlation_id,
         )
         if use_native:
             return extract_native_document_text(input_path), None
 
         ocr_service = get_ocr_service(
+            api_key=settings.yandex_vision_api_key,
+            folder_id=settings.yandex_folder_id,
             artifacts_path=settings.ocr_mineru_models_dir,
             use_gpu=settings.ocr_mineru_use_gpu,
             backend=settings.ocr_mineru_backend,

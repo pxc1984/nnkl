@@ -1,4 +1,4 @@
-"""Конфигурация приложения через pydantic-settings."""
+"""Configuration via pydantic-settings."""
 
 from pathlib import Path
 
@@ -7,7 +7,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """Настройки API и синхронного OCR-парсера."""
+    """API and synchronous OCR parser settings."""
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -42,9 +42,14 @@ class Settings(BaseSettings):
 
     ocr_temp_dir: Path = Path("/app/tmp")
 
-    ocr_mineru_models_dir: Path | None = None
-    ocr_mineru_use_gpu: bool = False
-    ocr_mineru_backend: str = "pipeline"
+    # Yandex Vision API settings
+    yandex_vision_api_key: str = Field(default="", validation_alias="YANDEX_VISION_API_KEY")
+    yandex_folder_id: str = Field(default="", validation_alias="YANDEX_FOLDER_ID")
+
+    # OCR processing settings (keeping for backward compatibility)
+    ocr_mineru_models_dir: Path | None = None  # Not used with Yandex Vision
+    ocr_mineru_use_gpu: bool = False  # Not used with Yandex Vision
+    ocr_mineru_backend: str = "yandex-vision"  # Updated default
     ocr_mineru_document_timeout_seconds: float = 1800.0
     ocr_mineru_preprocess_scans: bool = True
     ocr_mineru_scan_dpi: int = 220

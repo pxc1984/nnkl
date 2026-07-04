@@ -136,7 +136,7 @@
 		<div class="text-destructive bg-destructive/10 rounded-2xl border border-destructive/20 px-4 py-3 text-sm">{errorMessage}</div>
 	{/if}
 
-	{#if isLoading}
+	{#if isLoading && !object}
 		<div class="grid gap-6 xl:grid-cols-[minmax(0,1.8fr)_minmax(20rem,0.9fr)]">
 			<div class="space-y-6">
 				<div class="bg-card/90 rounded-[1.75rem] border border-border/60 p-6"><Skeleton class="h-7 w-64 rounded-full" /></div>

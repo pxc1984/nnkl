@@ -57,7 +57,7 @@ export async function listKnowledgeObjects(
         pageSize: params.pageSize,
         query: params.query,
         type: params.type,
-        tags: params.tags,
+        status: params.status,
       },
     },
   );

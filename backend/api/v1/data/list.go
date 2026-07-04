@@ -13,14 +13,13 @@ import (
 func (a *DataAPI) list(c *gin.Context) {
 	page := parsePositiveInt(c.DefaultQuery("page", "1"), 1)
 	pageSize := parsePositiveInt(c.DefaultQuery("pageSize", "20"), 20)
-	tags := trimNonEmpty(c.QueryArray("tags"))
 
 	uploads, total, err := a.store.ListUploads(c.Request.Context(), models.ListUploadsParams{
 		Page:     page,
 		PageSize: pageSize,
 		Query:    strings.TrimSpace(c.Query("query")),
 		FileType: strings.ToLower(strings.TrimSpace(c.Query("type"))),
-		Tags:     tags,
+		Status:   normalizeUploadListStatus(strings.ToLower(strings.TrimSpace(c.Query("status")))),
 	})
 	if err != nil {
 		api.RespondError(c, http.StatusInternalServerError, "failed to list objects", "internal_error")
@@ -49,4 +48,15 @@ func (a *DataAPI) list(c *gin.Context) {
 			TotalPages: totalPages,
 		},
 	})
+}
+
+func normalizeUploadListStatus(value string) string {
+	switch value {
+	case "ready":
+		return "completed"
+	case "pending", "processing", "completed", "failed":
+		return value
+	default:
+		return ""
+	}
 }

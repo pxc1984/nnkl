@@ -62,7 +62,7 @@ type ListUploadsParams struct {
 	PageSize int
 	Query    string
 	FileType string
-	Tags     []string
+	Status   string
 }
 
 type UpdateUploadParams struct {

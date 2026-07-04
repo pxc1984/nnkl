@@ -189,7 +189,7 @@
 		</div>
 
 		<div class="sticky bottom-4 mt-8">
-			<div class="rounded-2xl border border-border/15 bg-muted/20 px-5 py-4">
+			<div class="rounded-2xl border bg-[#101010] px-5 py-4">
 				<textarea
 						bind:value={prompt}
 						onkeydown={handleKeyDown}

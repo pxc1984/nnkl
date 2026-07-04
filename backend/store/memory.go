@@ -370,6 +370,9 @@ func (s *InMemoryStore) ListUploads(_ context.Context, params models.ListUploads
 		if params.FileType != "" && blob.FileType != strings.ToLower(params.FileType) {
 			continue
 		}
+		if params.Status != "" && upload.Status != params.Status {
+			continue
+		}
 		filtered = append(filtered, upload)
 	}
 
@@ -587,20 +590,4 @@ func (s *InMemoryStore) deleteBlobIfUnreferenced(blobID string) {
 		}
 	}
 	delete(s.blobs, blobID)
-}
-
-func containsAllTags(blobTags, filterTags []string) bool {
-	if len(filterTags) == 0 {
-		return true
-	}
-	available := make(map[string]struct{}, len(blobTags))
-	for _, tag := range blobTags {
-		available[strings.ToLower(tag)] = struct{}{}
-	}
-	for _, tag := range filterTags {
-		if _, ok := available[strings.ToLower(tag)]; !ok {
-			return false
-		}
-	}
-	return true
 }

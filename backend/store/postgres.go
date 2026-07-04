@@ -263,10 +263,13 @@ func (s *PostgresStore) ListUploads(ctx context.Context, params models.ListUploa
 
 	query := s.db.WithContext(ctx).Model(&models.Upload{}).Joins("InputBlob")
 	if params.Query != "" {
-		query = query.Where("InputBlob.filename ILIKE ?", "%"+params.Query+"%")
+		query = query.Where(`"InputBlob"."filename" ILIKE ?`, "%"+params.Query+"%")
 	}
 	if params.FileType != "" {
-		query = query.Where("InputBlob.file_type = ?", strings.ToLower(params.FileType))
+		query = query.Where(`"InputBlob"."file_type" = ?`, strings.ToLower(params.FileType))
+	}
+	if params.Status != "" {
+		query = query.Where(`"uploads"."status" = ?`, params.Status)
 	}
 
 	var total int64

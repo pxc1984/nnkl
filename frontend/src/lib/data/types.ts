@@ -69,7 +69,7 @@ export type DataListParams = {
   pageSize?: number;
   query?: string;
   type?: string;
-  tags?: string[];
+  status?: KnowledgeObjectStatus;
 };
 
 export type DataUploadParams = {

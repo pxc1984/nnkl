@@ -7,13 +7,6 @@ import type {
 export const DEFAULT_DATA_PAGE_SIZE = 20;
 export const CONTENT_PREVIEW_LENGTH = 4000;
 
-export function parseTagsInput(value: string): string[] {
-  return value
-    .split(",")
-    .map((tag) => tag.trim())
-    .filter(Boolean);
-}
-
 export function formatBytes(size?: number): string {
   if (!size || size < 0) {
     return "-";
@@ -80,12 +73,6 @@ export function buildDataSearchParams(params: DataListParams): URLSearchParams {
     searchParams.set("type", params.type.trim());
   }
 
-  for (const tag of params.tags ?? []) {
-    if (tag.trim()) {
-      searchParams.append("tags", tag.trim());
-    }
-  }
-
   if (params.page && params.page > 1) {
     searchParams.set("page", String(params.page));
   }
@@ -95,18 +82,6 @@ export function buildDataSearchParams(params: DataListParams): URLSearchParams {
   }
 
   return searchParams;
-}
-
-export function getTagsFromSearchParams(
-  searchParams: URLSearchParams,
-): string[] {
-  const values = searchParams.getAll("tags");
-  if (values.length > 0) {
-    return values.flatMap((value) => parseTagsInput(value));
-  }
-
-  const fallback = searchParams.get("tags");
-  return fallback ? parseTagsInput(fallback) : [];
 }
 
 export function getMetadataEntries(

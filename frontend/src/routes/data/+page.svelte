@@ -19,12 +19,15 @@
 		PaginationState,
 	} from "@tanstack/table-core";
 	import { getCoreRowModel } from "@tanstack/table-core";
-	import type { KnowledgeObject, PaginationMeta } from "$lib/data/types";
+	import type {
+		KnowledgeObject,
+		KnowledgeObjectStatus,
+		PaginationMeta,
+	} from "$lib/data/types";
 	import {
 		formatBytes,
 		formatDateTime,
 		getObjectTitle,
-		parseTagsInput,
 	} from "$lib/data/utils";
 	import { cn } from "$lib/utils.js";
 	import { createRawSnippet } from "svelte";
@@ -37,6 +40,13 @@
 		{ value: "docx", label: "DOCX" },
 		{ value: "pptx", label: "PPTX" },
 		{ value: "markdown", label: "Markdown" },
+	];
+	const STATUS_OPTIONS: Array<{ value: "" | KnowledgeObjectStatus; label: string }> = [
+		{ value: "", label: "Все статусы" },
+		{ value: "pending", label: "В очереди" },
+		{ value: "processing", label: "Обработка" },
+		{ value: "ready", label: "Готов" },
+		{ value: "failed", label: "Ошибка" },
 	];
 
 	let objects = $state<KnowledgeObject[]>([]);
@@ -52,11 +62,10 @@
 	let queryInput = $state("");
 	let appliedQuery = $state("");
 	let typeFilter = $state("");
-	let tagsInput = $state("");
+	let statusFilter = $state<"" | KnowledgeObjectStatus>("");
 	let queryDebounceTimeout: number | null = null;
 
-	const tagFilters = $derived(parseTagsInput(tagsInput));
-	const hasActiveFilters = $derived(Boolean(appliedQuery || typeFilter || tagFilters.length > 0));
+	const hasActiveFilters = $derived(Boolean(appliedQuery || typeFilter || statusFilter));
 
 	function clearDeleteConfirmation(): void {
 		if (deleteConfirmTimeout !== null) {
@@ -115,11 +124,11 @@
 		filters: {
 			query: string;
 			type: string;
-			tags: string[];
+			status: "" | KnowledgeObjectStatus;
 		} = {
 			query: appliedQuery,
 			type: typeFilter,
-			tags: tagFilters,
+			status: statusFilter,
 		},
 	): Promise<void> {
 		const currentRun = ++requestRun;
@@ -132,7 +141,7 @@
 				pageSize: PAGE_SIZE,
 				query: filters.query || undefined,
 				type: filters.type || undefined,
-				tags: filters.tags.length > 0 ? filters.tags : undefined,
+				status: filters.status || undefined,
 			});
 			if (currentRun !== requestRun) {
 				return;
@@ -168,17 +177,39 @@
 		resetToFirstPage();
 	}
 
-	function handleTagsInput(value: string): void {
-		tagsInput = value;
+	function handleStatusFilterChange(value: "" | KnowledgeObjectStatus): void {
+		statusFilter = value;
 		resetToFirstPage();
 	}
 
-	function clearFilters(): void {
-		queryInput = "";
-		appliedQuery = "";
-		typeFilter = "";
-		tagsInput = "";
+	function applyQueryFilterImmediately(): void {
+		const nextQuery = queryInput.trim();
+
+		if (queryDebounceTimeout !== null) {
+			window.clearTimeout(queryDebounceTimeout);
+			queryDebounceTimeout = null;
+		}
+
+		const shouldForceReload = currentPage === 1 && appliedQuery === nextQuery;
+		appliedQuery = nextQuery;
 		resetToFirstPage();
+
+		if (shouldForceReload) {
+			void loadData(1, {
+				query: nextQuery,
+				type: typeFilter,
+				status: statusFilter,
+			});
+		}
+	}
+
+	function handleQueryKeydown(event: KeyboardEvent): void {
+		if (event.key !== "Enter") {
+			return;
+		}
+
+		event.preventDefault();
+		applyQueryFilterImmediately();
 	}
 
 	$effect(() => {
@@ -210,9 +241,9 @@
 		const pageNum = currentPage;
 		const query = appliedQuery;
 		const type = typeFilter;
-		const tags = [...tagFilters];
+		const status = statusFilter;
 
-		void loadData(pageNum, { query, type, tags });
+		void loadData(pageNum, { query, type, status });
 	});
 
 	$effect(() => {
@@ -318,14 +349,15 @@
 		</div>
 	{/if}
 
-	<div class="flex flex-col gap-3 rounded-2xl border border-border/50 p-4 md:flex-row md:items-end">
+	<div class="flex flex-col gap-3 md:flex-row md:items-end">
 		<div class="flex-1 space-y-1.5">
-			<label class="text-sm font-medium" for="data-query-filter">Поиск</label>
+			<label class="text-sm font-medium" for="data-query-filter">Поиск по названию</label>
 			<Input
 				id="data-query-filter"
 				placeholder="Название файла..."
 				bind:value={queryInput}
 				oninput={resetToFirstPage}
+				onkeydown={handleQueryKeydown}
 				class="max-w-none"
 			/>
 		</div>
@@ -344,26 +376,19 @@
 			</select>
 		</div>
 
-		<div class="flex-1 space-y-1.5">
-			<label class="text-sm font-medium" for="data-tags-filter">Теги</label>
-			<Input
-				id="data-tags-filter"
-				placeholder="tag1, tag2"
-				value={tagsInput}
-				oninput={(event) => handleTagsInput(event.currentTarget.value)}
-				onchange={(event) => handleTagsInput(event.currentTarget.value)}
-				class="max-w-none"
-			/>
+		<div class="space-y-1.5 md:w-48">
+			<label class="text-sm font-medium" for="data-status-filter">Статус</label>
+			<select
+				id="data-status-filter"
+				class="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex h-8 w-full rounded-md border px-3 py-1 text-sm focus-visible:ring-2 focus-visible:outline-none"
+				value={statusFilter}
+				onchange={(event) => handleStatusFilterChange(event.currentTarget.value as "" | KnowledgeObjectStatus)}
+			>
+				{#each STATUS_OPTIONS as option (option.value)}
+					<option value={option.value}>{option.label}</option>
+				{/each}
+			</select>
 		</div>
-
-		<Button
-			variant="outline"
-			disabled={!hasActiveFilters}
-			onclick={clearFilters}
-			class="md:self-end"
-		>
-			Сбросить
-		</Button>
 	</div>
 
 	{#if isLoading}

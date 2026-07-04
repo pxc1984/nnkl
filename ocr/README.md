@@ -5,8 +5,8 @@ FastAPI parsing microservice for synchronous processing of `pdf`, `docx`, and `p
 ## Flow
 
 1. Gateway stores document bytes in shared Postgres table `input_blobs`.
-2. Gateway sends `POST /api/v1/parse` with `document_id`, `input_blob_id`, `output_format`, `language`.
-3. OCR service reads the blob from Postgres, parses `pdf` through Docling and extracts `docx` / `pptx` text natively, stores output in Postgres tables `parse_jobs` and `parse_results`, and returns `201 Created`.
+2. Gateway sends `POST /api/v1/parse` with `document_id`, `input_blob_id`, `language`.
+3. OCR service reads the blob from Postgres, parses `pdf` through MinerU and extracts `docx` / `pptx` text natively, stores output in Postgres tables `parse_jobs` and `parse_results`, and returns `201 Created`.
 4. Gateway can read status and result through OCR API or directly from the shared database.
 
 ## API
@@ -19,7 +19,6 @@ curl -X POST http://localhost:8000/api/v1/parse \
   -d '{
     "document_id": "doc-123",
     "input_blob_id": "blob-123",
-    "output_format": "latex",
     "language": "auto"
   }'
 ```
@@ -74,6 +73,22 @@ Services:
 - Postgres: `localhost:5432`
 
 OCR is started from the root `docker-compose.yml` and uses the shared root `.env`.
+
+## MinerU
+
+PDF parsing uses [MinerU](https://github.com/OpenDataLab/MinerU) (`pipeline` backend by default).
+
+Environment variables:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `OCR_MINERU_USE_GPU` | `false` | Use GPU backend when available |
+| `OCR_MINERU_BACKEND` | `pipeline` | MinerU backend (`pipeline`, `hybrid-auto-engine`, ...) |
+| `OCR_MINERU_MODELS_DIR` | — | Local models cache directory |
+| `OCR_MINERU_DOCUMENT_TIMEOUT_SECONDS` | `1800` | MinerU subprocess timeout |
+| `MINERU_MODEL_SOURCE` | `huggingface` | Set to `modelscope` if HuggingFace is blocked |
+
+First container start downloads MinerU models (~2–4 GB).
 
 ## Test
 

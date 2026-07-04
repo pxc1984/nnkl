@@ -55,7 +55,7 @@ class TestHealthEndpoint:
 
 class TestParseEndpoint:
     @patch("app.use_cases.parse_document.get_ocr_service")
-    def test_parse_native_pdf_bypasses_docling(
+    def test_parse_native_pdf_bypasses_mineru(
         self, mock_get_ocr_service, client: TestClient, db_session, sample_pdf: Path
     ) -> None:
         blob_id = str(uuid.uuid4())
@@ -66,7 +66,6 @@ class TestParseEndpoint:
             json={
                 "document_id": "doc-native-pdf",
                 "input_blob_id": blob_id,
-                "output_format": "markdown",
                 "language": "auto",
             },
         )
@@ -82,7 +81,7 @@ class TestParseEndpoint:
 
     @patch("app.use_cases.parse_document.extract_native_document_text")
     @patch("app.use_cases.parse_document.get_ocr_service")
-    def test_parse_corrupted_native_pdf_falls_back_to_docling(
+    def test_parse_corrupted_native_pdf_falls_back_to_mineru(
         self,
         mock_get_ocr_service,
         mock_extract_native_document_text,
@@ -93,7 +92,7 @@ class TestParseEndpoint:
         blob_id = str(uuid.uuid4())
         _insert_blob(db_session, sample_pdf, blob_id=blob_id)
         ocr_service = mock_get_ocr_service.return_value
-        ocr_service.convert.return_value = ("docling fallback", None)
+        ocr_service.convert.return_value = ("mineru fallback", None)
 
         with patch(
             "app.use_cases.parse_document.should_use_native_pdf_text",
@@ -104,7 +103,6 @@ class TestParseEndpoint:
                 json={
                     "document_id": "doc-fallback-pdf",
                     "input_blob_id": blob_id,
-                    "output_format": "markdown",
                     "language": "auto",
                 },
             )
@@ -127,7 +125,6 @@ class TestParseEndpoint:
             json={
                 "document_id": "doc-1",
                 "input_blob_id": blob_id,
-                "output_format": "latex",
                 "language": "auto",
             },
         )
@@ -150,7 +147,6 @@ class TestParseEndpoint:
             json={
                 "document_id": "doc-missing",
                 "input_blob_id": missing_blob_id,
-                "output_format": "latex",
                 "language": "auto",
             },
         )
@@ -174,7 +170,6 @@ class TestStatusAndResultEndpoints:
             json={
                 "document_id": document_id,
                 "input_blob_id": blob_id,
-                "output_format": "markdown",
                 "language": "en",
             },
         )
@@ -210,7 +205,6 @@ class TestNativeOfficeExtraction:
             json={
                 "document_id": "doc-docx",
                 "input_blob_id": blob_id,
-                "output_format": "markdown",
                 "language": "auto",
             },
         )
@@ -240,7 +234,6 @@ class TestNativeOfficeExtraction:
             json={
                 "document_id": "doc-pptx",
                 "input_blob_id": blob_id,
-                "output_format": "markdown",
                 "language": "auto",
             },
         )

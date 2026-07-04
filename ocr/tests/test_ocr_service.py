@@ -7,6 +7,7 @@ from pathlib import Path
 from app.services.table_postprocessor import (
     normalize_numeric_text,
     normalize_unit_text,
+    postprocess_markdown_tables,
     postprocess_table_cell,
 )
 from app.use_cases.document_extractor import (
@@ -24,6 +25,13 @@ class TestTablePostprocessor:
 
     def test_postprocess_cell(self) -> None:
         result = postprocess_table_cell("  450  Мпа  ")
+        assert "МПа" in result
+
+
+class TestMarkdownPostprocessor:
+    def test_postprocess_markdown_tables(self) -> None:
+        markdown = "<table><tr><td>450 Мпа</td></tr></table>"
+        result = postprocess_markdown_tables(markdown)
         assert "МПа" in result
 
 

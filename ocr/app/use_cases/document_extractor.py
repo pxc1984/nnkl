@@ -17,22 +17,17 @@ class UnsupportedDocumentTypeError(Exception):
     """Raised when the document type is not supported."""
 
 
-def extract_native_document_text(file_path: Path, *, output_format: str) -> str:
+def extract_native_document_text(file_path: Path) -> str:
     suffix = file_path.suffix.lower()
     if suffix == ".pdf":
-        text = _extract_pdf_text(file_path)
-    elif suffix == ".docx":
-        text = _extract_docx_text(file_path)
-    elif suffix == ".pptx":
-        text = _extract_pptx_text(file_path)
-    else:
-        raise UnsupportedDocumentTypeError(
-            f"Unsupported document type: {suffix or 'unknown'}"
-        )
-
-    if output_format == "latex":
-        return _to_latex(text)
-    return _to_markdown(text)
+        return _extract_pdf_text(file_path)
+    if suffix == ".docx":
+        return _extract_docx_text(file_path)
+    if suffix == ".pptx":
+        return _extract_pptx_text(file_path)
+    raise UnsupportedDocumentTypeError(
+        f"Unsupported document type: {suffix or 'unknown'}"
+    )
 
 
 def has_native_pdf_text(file_path: Path, *, min_chars: int = 50) -> bool:
@@ -131,25 +126,3 @@ def _extract_pptx_text(file_path: Path) -> str:
             slides.append("\n\n".join(parts))
 
     return "\n\n".join(slides).strip()
-
-
-def _to_markdown(text: str) -> str:
-    return text
-
-
-def _to_latex(text: str) -> str:
-    replacements = {
-        "\\": r"\textbackslash{}",
-        "&": r"\&",
-        "%": r"\%",
-        "$": r"\$",
-        "#": r"\#",
-        "_": r"\_",
-        "{": r"\{",
-        "}": r"\}",
-        "~": r"\textasciitilde{}",
-        "^": r"\textasciicircum{}",
-    }
-    escaped = "".join(replacements.get(char, char) for char in text)
-    paragraphs = [part.strip() for part in escaped.split("\n\n") if part.strip()]
-    return "\n\n".join(paragraphs)

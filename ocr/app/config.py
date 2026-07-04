@@ -36,10 +36,10 @@ class Settings(BaseSettings):
 
     ocr_temp_dir: Path = Path("/app/tmp")
 
-    ocr_docling_artifacts_path: Path | None = None
-    ocr_docling_use_gpu: bool = False
-    ocr_docling_do_formula_enrichment: bool = False
-    ocr_docling_document_timeout_seconds: float = 30.0
+    ocr_mineru_models_dir: Path | None = None
+    ocr_mineru_use_gpu: bool = False
+    ocr_mineru_backend: str = "pipeline"
+    ocr_mineru_document_timeout_seconds: float = 1800.0
 
     ocr_api_prefix: str = "/api/v1"
 

@@ -15,38 +15,16 @@ from fastapi.testclient import TestClient
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-# Лёгкие моки docling для unit-тестов без тяжёлых зависимостей
-if "docling" not in sys.modules:
-    _mock_format = MagicMock()
-    _mock_format.PDF = "pdf"
-    for _name in [
-        "docling",
-        "docling.datamodel",
-        "docling.datamodel.base_models",
-        "docling.datamodel.pipeline_options",
-        "docling.document_converter",
-        "docling_core",
-        "docling_core.transforms",
-        "docling_core.transforms.serializer",
-        "docling_core.transforms.serializer.base",
-        "docling_core.transforms.serializer.common",
-        "docling_core.transforms.serializer.latex",
-        "docling_core.types",
-        "docling_core.types.doc",
-        "docling_core.types.doc.base",
-        "docling_core.types.doc.document",
-    ]:
-        sys.modules.setdefault(_name, MagicMock())
-    sys.modules["docling.datamodel.base_models"].InputFormat = _mock_format
-    sys.modules["docling.datamodel.pipeline_options"].AcceleratorOptions = MagicMock
+# Лёгкие моки mineru CLI для unit-тестов без тяжёлых зависимостей
+if "mineru" not in sys.modules:
+    sys.modules.setdefault("mineru", MagicMock())
 
 TEST_ROOT = Path(__file__).resolve().parent / "fixtures"
 TEST_DATABASE = TEST_ROOT / "test.sqlite3"
 
 os.environ.setdefault("DATABASE_URL", f"sqlite:///{TEST_DATABASE}")
 os.environ.setdefault("TEMP_DIR", str(TEST_ROOT / "tmp"))
-os.environ.setdefault("DOCLING_USE_GPU", "false")
-os.environ.setdefault("DOCLING_DO_FORMULA_ENRICHMENT", "false")
+os.environ.setdefault("MINERU_USE_GPU", "false")
 
 
 @pytest.fixture(autouse=True)

@@ -10,7 +10,6 @@ from pydantic import BaseModel, Field
 
 
 class OutputFormat(str, Enum):
-    LATEX = "latex"
     MARKDOWN = "markdown"
 
 
@@ -25,7 +24,6 @@ class ParseRequest(BaseModel):
 
     document_id: str = Field(..., min_length=1, max_length=255)
     input_blob_id: uuid.UUID
-    output_format: OutputFormat = OutputFormat.LATEX
     language: Language = Language.AUTO
 
 

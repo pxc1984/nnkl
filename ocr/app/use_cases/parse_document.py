@@ -47,7 +47,7 @@ def parse_document(
             document_id=request.document_id,
             input_blob_id=blob.id,
             status=TaskStatus.PROCESSING.value,
-            output_format=request.output_format.value,
+            output_format="markdown",
             language=request.language.value,
             error=None,
         )
@@ -55,7 +55,7 @@ def parse_document(
     else:
         job.input_blob_id = blob.id
         job.status = TaskStatus.PROCESSING.value
-        job.output_format = request.output_format.value
+        job.output_format = "markdown"
         job.language = request.language.value
         job.error = None
     session.commit()
@@ -71,7 +71,6 @@ def parse_document(
 
         content, image_dir = _parse_input_document(
             input_path,
-            output_format=request.output_format.value,
             language=request.language.value,
             correlation_id=correlation_id,
             results_dir=output_dir,
@@ -83,13 +82,13 @@ def parse_document(
             result = ParseResult(
                 id=uuid.uuid4(),
                 job_id=job.id,
-                content_type=_resolve_content_type(request.output_format.value),
+                content_type="text/markdown",
                 content_text=content,
                 assets_zip=_pack_assets(image_dir),
             )
             session.add(result)
         else:
-            result.content_type = _resolve_content_type(request.output_format.value)
+            result.content_type = "text/markdown"
             result.content_text = content
             result.assets_zip = _pack_assets(image_dir)
 
@@ -117,7 +116,6 @@ def _resolve_filename(filename: str) -> str:
 def _parse_input_document(
     input_path: Path,
     *,
-    output_format: str,
     language: str,
     correlation_id: str | None,
     results_dir: Path,
@@ -125,33 +123,24 @@ def _parse_input_document(
 ) -> tuple[str, Path | None]:
     if input_path.suffix.lower() == ".pdf":
         if should_use_native_pdf_text(input_path):
-            return extract_native_document_text(
-                input_path, output_format=output_format
-            ), None
+            return extract_native_document_text(input_path), None
 
         ocr_service = get_ocr_service(
-            artifacts_path=settings.ocr_docling_artifacts_path,
-            use_gpu=settings.ocr_docling_use_gpu,
-            do_formula_enrichment=settings.ocr_docling_do_formula_enrichment,
-            document_timeout=settings.ocr_docling_document_timeout_seconds,
+            artifacts_path=settings.ocr_mineru_models_dir,
+            use_gpu=settings.ocr_mineru_use_gpu,
+            backend=settings.ocr_mineru_backend,
+            document_timeout=settings.ocr_mineru_document_timeout_seconds,
         )
         return ocr_service.convert(
             input_path,
-            output_format=output_format,
             language=language,
             correlation_id=correlation_id,
             results_dir=results_dir,
             needs_ocr=True,
         )
 
-    content = extract_native_document_text(input_path, output_format=output_format)
+    content = extract_native_document_text(input_path)
     return content, None
-
-
-def _resolve_content_type(output_format: str) -> str:
-    if output_format == "latex":
-        return "application/x-tex"
-    return "text/markdown"
 
 
 def _pack_assets(image_dir: Path | None) -> bytes | None:

@@ -44,44 +44,44 @@
 	{#each items as item, index (`${item.type}-${index}`)}
 		{#if item.type === "heading"}
 			{#if item.depth === 1}
-				<h1>{@render renderInline(item.tokens ?? [])}</h1>
+				<h1 class="text-3xl font-semibold tracking-tight text-foreground md:text-4xl">{@render renderInline(item.tokens ?? [])}</h1>
 			{:else if item.depth === 2}
-				<h2>{@render renderInline(item.tokens ?? [])}</h2>
+				<h2 class="text-2xl font-semibold tracking-tight text-foreground md:text-3xl">{@render renderInline(item.tokens ?? [])}</h2>
 			{:else if item.depth === 3}
-				<h3>{@render renderInline(item.tokens ?? [])}</h3>
+				<h3 class="text-xl font-semibold tracking-tight text-foreground md:text-2xl">{@render renderInline(item.tokens ?? [])}</h3>
 			{:else}
-				<h4>{@render renderInline(item.tokens ?? [])}</h4>
+				<h4 class="text-lg font-semibold tracking-tight text-foreground">{@render renderInline(item.tokens ?? [])}</h4>
 			{/if}
 		{:else if item.type === "paragraph"}
-			<p>{@render renderInline(item.tokens ?? [])}</p>
+			<p class="leading-7 text-foreground/90">{@render renderInline(item.tokens ?? [])}</p>
 		{:else if item.type === "list"}
 			{#if item.ordered}
-				<ol>
+				<ol class="list-decimal space-y-2 pl-6 text-foreground/90 marker:text-muted-foreground">
 					{#each item.items as listItem, listIndex (`${listItem.text}-${listIndex}`)}
 						<li>{@render renderInline(listItem.tokens ?? inlineTokens(listItem.text))}</li>
 					{/each}
 				</ol>
 			{:else}
-				<ul>
+				<ul class="list-disc space-y-2 pl-6 text-foreground/90 marker:text-muted-foreground">
 					{#each item.items as listItem, listIndex (`${listItem.text}-${listIndex}`)}
 						<li>{@render renderInline(listItem.tokens ?? inlineTokens(listItem.text))}</li>
 					{/each}
 				</ul>
 			{/if}
 		{:else if item.type === "blockquote"}
-			<blockquote>
+			<blockquote class="border-border/70 text-muted-foreground border-l-2 pl-4 italic">
 				{@render renderBlocks(item.tokens ?? [])}
 			</blockquote>
 		{:else if item.type === "code"}
-			<pre><code>{item.text}</code></pre>
+			<pre class="bg-background overflow-x-auto rounded-xl border border-border/60 p-4"><code>{item.text}</code></pre>
 		{:else if item.type === "hr"}
-			<hr />
+			<hr class="border-border/60" />
 		{:else if item.type !== "space"}
-			<p>{item.raw}</p>
+			<p class="leading-7 text-foreground/90">{item.raw}</p>
 		{/if}
 	{/each}
 {/snippet}
 
-<div class="prose prose-invert prose-pre:bg-background prose-pre:border prose-pre:border-border/60 prose-code:text-foreground max-w-none">
+<div class="max-w-none space-y-5 break-words text-base">
 	{@render renderBlocks(tokens)}
 </div>

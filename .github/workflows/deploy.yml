@@ -2,10 +2,13 @@ name: Deploy
 
 on:
   workflow_dispatch:
-  workflow_run:
-    workflows: ['Format & Test']
-    types: [completed]
-    branches: [master]
+  push:
+    branches:
+      - master
+#  workflow_run:
+#    workflows: ['Format & Test']
+#    types: [completed]
+#    branches: [master]
 
 jobs:
   deploy:

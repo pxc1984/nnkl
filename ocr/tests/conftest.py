@@ -55,8 +55,7 @@ def sample_pdf() -> Path:
     page = doc.new_page()
     page.insert_text(
         (72, 72),
-        "Тестовый материал: сталь 09Г2С, предел прочности σ = 450 МПа при 20°C. "
-        "Марка стали соответствует ГОСТ 19281.",
+        "Test material GOST 19281 with a reliable native PDF text layer for routing.",
     )
     doc.save(pdf_path)
     doc.close()

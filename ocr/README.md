@@ -86,6 +86,11 @@ Environment variables:
 | `OCR_MINERU_BACKEND` | `pipeline` | MinerU backend (`pipeline`, `hybrid-auto-engine`, ...) |
 | `OCR_MINERU_MODELS_DIR` | — | Local models cache directory |
 | `OCR_MINERU_DOCUMENT_TIMEOUT_SECONDS` | `1800` | MinerU subprocess timeout |
+| `OCR_MINERU_PREPROCESS_SCANS` | `true` | Rasterize low-quality/scanned PDFs before OCR |
+| `OCR_MINERU_SCAN_DPI` | `220` | Scan rasterization DPI |
+| `OCR_MINERU_MAX_PAGE_MEGAPIXELS` | `12` | Per-page memory safety limit |
+| `OCR_NATIVE_MIN_CHARACTERS` | `40` | Minimum useful native text per page |
+| `OCR_NATIVE_MINIMUM_USABLE_PAGE_RATIO` | `0.95` | Native pages required to bypass OCR |
 | `MINERU_MODEL_SOURCE` | `huggingface` | Set to `modelscope` if HuggingFace is blocked |
 
 First container start downloads MinerU models (~2–4 GB).

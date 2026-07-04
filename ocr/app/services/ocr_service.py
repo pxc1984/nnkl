@@ -12,6 +12,7 @@ import fitz
 import structlog
 
 from app.core.pdf_validator import validate_pdf
+from app.services.pdf_quality import analyze_pdf
 from app.services.progress import ProgressCallback
 from app.services.table_postprocessor import postprocess_markdown_tables
 
@@ -20,9 +21,9 @@ logger = structlog.get_logger(__name__)
 LanguageChoice = Literal["ru", "en", "auto"]
 
 _MINERU_LANG_MAP: dict[LanguageChoice, str] = {
-    "ru": "ch",
-    "en": "en",
-    "auto": "ch",
+    "ru": "cyrillic",
+    "en": "ch",
+    "auto": "cyrillic",
 }
 
 
@@ -36,11 +37,17 @@ class OCRService:
         use_gpu: bool = False,
         backend: str = "pipeline",
         document_timeout: float = 1800.0,
+        preprocess_scans: bool = True,
+        scan_dpi: int = 220,
+        max_page_megapixels: float = 12.0,
     ) -> None:
         self._models_dir = models_dir
         self._use_gpu = use_gpu
         self._backend = backend if use_gpu else "pipeline"
         self._document_timeout = document_timeout
+        self._preprocess_scans = preprocess_scans
+        self._scan_dpi = max(72, scan_dpi)
+        self._max_page_pixels = max(1.0, max_page_megapixels) * 1_000_000
         self._ready = False
         logger.info(
             "ocr_service.initializing",
@@ -48,6 +55,9 @@ class OCRService:
             backend=self._backend,
             use_gpu=use_gpu,
             document_timeout=document_timeout,
+            preprocess_scans=preprocess_scans,
+            scan_dpi=scan_dpi,
+            max_page_megapixels=max_page_megapixels,
         )
 
     def warm_up(self) -> None:
@@ -80,7 +90,7 @@ class OCRService:
             needs_ocr = _detect_scan_quality(file_path)
 
         working_path = file_path
-        if needs_ocr:
+        if needs_ocr and self._preprocess_scans:
             working_path = self._preprocess_scan(file_path, correlation_id=correlation_id)
             if progress_callback:
                 progress_callback(10, "preprocessing")
@@ -141,20 +151,36 @@ class OCRService:
         logger.info(
             "ocr_service.preprocess_started",
             path=str(source_path),
+            dpi=self._scan_dpi,
             correlation_id=correlation_id,
         )
         temp_dir = source_path.parent / f"mineru_preprocess_{source_path.stem}"
         temp_dir.mkdir(parents=True, exist_ok=True)
         output_path = temp_dir / source_path.name
 
-        with fitz.open(source_path) as doc:
-            for page in doc:
-                page.get_pixmap(dpi=200, alpha=False)
-                page.clean_contents()
-            doc.save(output_path, garbage=4, deflate=True)
+        with fitz.open(source_path) as source, fitz.open() as rasterized:
+            for page_number, page in enumerate(source, start=1):
+                scale = self._scan_dpi / 72.0
+                expected_pixels = page.rect.width * scale * page.rect.height * scale
+                if expected_pixels > self._max_page_pixels:
+                    scale *= (self._max_page_pixels / expected_pixels) ** 0.5
+                pixmap = page.get_pixmap(
+                    matrix=fitz.Matrix(scale, scale), alpha=False
+                )
+                target = rasterized.new_page(
+                    width=page.rect.width, height=page.rect.height
+                )
+                target.insert_image(target.rect, stream=pixmap.tobytes("png"))
+                logger.debug(
+                    "ocr_service.page_preprocessed",
+                    page_number=page_number,
+                    width=pixmap.width,
+                    height=pixmap.height,
+                    correlation_id=correlation_id,
+                )
+            rasterized.save(output_path, garbage=4, deflate=True)
 
         return output_path
-
     def _run_mineru(
         self,
         input_path: Path,
@@ -280,15 +306,9 @@ def _collect_images(source_dir: Path, results_dir: Path | None) -> Path | None:
 
 def _detect_scan_quality(pdf_path: Path) -> bool:
     try:
-        with fitz.open(pdf_path) as doc:
-            if doc.page_count == 0:
-                return True
-            text = doc[0].get_text().strip()
-            return len(text) < 50
+        return not analyze_pdf(pdf_path).supports_native_extraction()
     except Exception:  # noqa: BLE001
         return True
-
-
 _ocr_service_instance: OCRService | None = None
 
 
@@ -299,6 +319,9 @@ def get_ocr_service(
     do_formula_enrichment: bool = False,
     document_timeout: float = 1800.0,
     backend: str = "hybrid-auto-engine",
+    preprocess_scans: bool = True,
+    scan_dpi: int = 220,
+    max_page_megapixels: float = 12.0,
 ) -> OCRService:
     """Возвращает синглтон OCRService для воркера."""
     del do_formula_enrichment
@@ -309,6 +332,9 @@ def get_ocr_service(
             use_gpu=use_gpu,
             backend=backend,
             document_timeout=document_timeout,
+            preprocess_scans=preprocess_scans,
+            scan_dpi=scan_dpi,
+            max_page_megapixels=max_page_megapixels,
         )
     return _ocr_service_instance
 

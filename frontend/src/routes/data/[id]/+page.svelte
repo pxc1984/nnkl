@@ -1,16 +1,18 @@
 <script lang="ts">
 	import { browser } from "$app/environment";
+	import { resolve } from "$app/paths";
 	import { page } from "$app/state";
-	import { onMount } from "svelte";
 	import { getApiErrorMessage } from "$lib/api/auth";
-	import { downloadKnowledgeObject, getKnowledgeObject, reprocessKnowledgeObject } from "$lib/api/data";
-	import DataPageHeader from "$lib/components/data/data-page-header.svelte";
+	import {
+		downloadKnowledgeObject,
+		getKnowledgeObject,
+		reprocessKnowledgeObject,
+	} from "$lib/api/data";
 	import DataStatusBadge from "$lib/components/data/data-status-badge.svelte";
-	import { Button } from "$lib/components/ui/button/index.js";
-	import * as Card from "$lib/components/ui/card/index.js";
-	import { Skeleton } from "$lib/components/ui/skeleton/index.js";
+	import * as Alert from "$lib/components/ui/alert/index.js";
 	import { Badge } from "$lib/components/ui/badge/index.js";
-	import type { KnowledgeObjectDetails } from "$lib/data/types";
+	import { Button } from "$lib/components/ui/button/index.js";
+	import { Skeleton } from "$lib/components/ui/skeleton/index.js";
 	import {
 		formatBytes,
 		formatDateTime,
@@ -19,271 +21,310 @@
 		getObjectTitle,
 		getObjectTypeLabel,
 	} from "$lib/data/utils";
+	import type { KnowledgeObjectDetails } from "$lib/data/types";
+	import ChevronLeftIcon from "@lucide/svelte/icons/chevron-left";
 	import DownloadIcon from "@lucide/svelte/icons/download";
-	import RefreshCwIcon from "@lucide/svelte/icons/refresh-cw";
-
-	const LOADING_SKELETON_DELAY_MS = 150;
+	import FileSearchIcon from "@lucide/svelte/icons/file-search";
+	import LoaderIcon from "@lucide/svelte/icons/loader";
 
 	let object = $state<KnowledgeObjectDetails | null>(null);
 	let isLoading = $state(false);
-	let isDownloading = $state(false);
 	let isReprocessing = $state(false);
+	let isDownloading = $state(false);
 	let errorMessage = $state("");
-	let showFullContent = $state(false);
-	let isMounted = $state(false);
+	let successMessage = $state("");
+	let requestRun = 0;
 
-	onMount(() => {
-		isMounted = true;
+	const objectId = $derived(page.params.id);
+	const metadataEntries = $derived(getMetadataEntries(object?.metadata));
+	const contentPreview = $derived(getContentPreview(object?.content));
 
-		return () => {
-			isMounted = false;
-		};
-	});
-
-	$effect(() => {
-		const id = page.params.id;
-		if (!browser || !isMounted || !id) {
+	async function loadObject(): Promise<void> {
+		if (!objectId) {
+			object = null;
+			errorMessage = "Не указан идентификатор документа.";
 			return;
 		}
 
-		object = null;
-		isLoading = false;
+		const currentRun = ++requestRun;
+		isLoading = true;
 		errorMessage = "";
-		let cancelled = false;
-		const loadingTimer = window.setTimeout(() => {
-			if (!cancelled) {
-				isLoading = true;
-			}
-		}, LOADING_SKELETON_DELAY_MS);
-
-		getKnowledgeObject(id)
-			.then((response) => {
-				if (cancelled) return;
-				object = response;
-				showFullContent = false;
-			})
-			.catch((error) => {
-				if (cancelled) return;
-				errorMessage = getApiErrorMessage(error, "Не удалось загрузить документ.");
-				object = null;
-			})
-			.finally(() => {
-				window.clearTimeout(loadingTimer);
-				if (!cancelled) {
-					isLoading = false;
-				}
-			});
-
-		return () => {
-			cancelled = true;
-			window.clearTimeout(loadingTimer);
-		};
-	});
-
-	async function handleDownload(): Promise<void> {
-		if (!object || isDownloading) {
-			return;
-		}
-
-		isDownloading = true;
 
 		try {
-			const { blob, filename } = await downloadKnowledgeObject(object.id);
-			const objectUrl = URL.createObjectURL(blob);
-			const anchor = document.createElement("a");
-			anchor.href = objectUrl;
-			anchor.download = filename || object.originalFilename || object.filename;
-			document.body.append(anchor);
-			anchor.click();
-			anchor.remove();
-			URL.revokeObjectURL(objectUrl);
+			const response = await getKnowledgeObject(objectId);
+			if (currentRun !== requestRun) {
+				return;
+			}
+
+			object = response;
 		} catch (error) {
-			errorMessage = getApiErrorMessage(error, "Не удалось скачать документ.");
+			if (currentRun !== requestRun) {
+				return;
+			}
+
+			object = null;
+			errorMessage = getApiErrorMessage(error, "Не удалось загрузить документ.");
 		} finally {
-			isDownloading = false;
+			if (currentRun === requestRun) {
+				isLoading = false;
+			}
 		}
 	}
 
 	async function handleReprocess(): Promise<void> {
-		if (!object || isReprocessing) {
+		if (!objectId || isReprocessing) {
 			return;
 		}
 
 		isReprocessing = true;
 		errorMessage = "";
+		successMessage = "";
 
 		try {
-			const updatedObject = await reprocessKnowledgeObject(object.id);
-			object = { ...object, ...updatedObject };
+			const updated = await reprocessKnowledgeObject(objectId);
+			object = object ? { ...object, ...updated } : { ...updated };
+			successMessage = "Повторная OCR-обработка запущена.";
+			await loadObject();
 		} catch (error) {
-			errorMessage = getApiErrorMessage(error, "Не удалось перезапустить обработку.");
+			errorMessage = getApiErrorMessage(error, "Не удалось запустить повторную OCR-обработку.");
 		} finally {
 			isReprocessing = false;
 		}
 	}
 
-	const contentState = $derived(getContentPreview(object?.content));
-	const metadataEntries = $derived(getMetadataEntries(object?.metadata));
+	async function handleDownload(): Promise<void> {
+		if (!objectId || isDownloading || !browser) {
+			return;
+		}
+
+		isDownloading = true;
+		errorMessage = "";
+		successMessage = "";
+
+		try {
+			const { blob, filename } = await downloadKnowledgeObject(objectId);
+			const url = URL.createObjectURL(blob);
+			const link = document.createElement("a");
+			link.href = url;
+			link.download = filename || object?.originalFilename || object?.filename || `${objectId}.bin`;
+			document.body.append(link);
+			link.click();
+			link.remove();
+			URL.revokeObjectURL(url);
+		} catch (error) {
+			errorMessage = getApiErrorMessage(error, "Не удалось скачать файл.");
+		} finally {
+			isDownloading = false;
+		}
+	}
+
+	function getBooleanLabel(value?: boolean): string {
+		if (value === true) {
+			return "Да";
+		}
+
+		if (value === false) {
+			return "Нет";
+		}
+
+		return "-";
+	}
+
+	$effect(() => {
+		if (!browser) {
+			return;
+		}
+
+		void loadObject();
+	});
 </script>
 
-<div class="flex flex-col gap-8">
-	<DataPageHeader
-		title={object ? getObjectTitle(object) : "Документ"}
-	>
-		{#snippet actions()}
-			<Button variant="outline" class="rounded-full" disabled={!object || isReprocessing} onclick={() => void handleReprocess()}>
-				<RefreshCwIcon class="size-4" />
-				{isReprocessing ? "Перезапускаем..." : "Переобработать"}
+<div class="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 py-2 pb-8">
+	<div class="flex flex-wrap items-center justify-between gap-3">
+		<Button href={resolve("/data")} variant="outline" class="rounded-full">
+			<ChevronLeftIcon class="size-4" />
+			К списку
+		</Button>
+
+		<div class="flex flex-wrap items-center gap-2">
+			<Button
+				variant="outline"
+				class="rounded-full"
+				disabled={isReprocessing || isLoading || !object}
+				onclick={() => void handleReprocess()}
+			>
+				{#if isReprocessing}
+					<LoaderIcon class="size-4 animate-spin" />
+				{:else}
+					<FileSearchIcon class="size-4" />
+				{/if}
+				Пере-OCR
 			</Button>
-			<Button class="rounded-full" disabled={!object || isDownloading} onclick={() => void handleDownload()}>
-				<DownloadIcon class="size-4" />
-				{isDownloading ? "Скачиваем..." : "Скачать"}
+
+			<Button
+				class="rounded-full"
+				disabled={isDownloading || isLoading || !object}
+				onclick={() => void handleDownload()}
+			>
+				{#if isDownloading}
+					<LoaderIcon class="size-4 animate-spin" />
+				{:else}
+					<DownloadIcon class="size-4" />
+				{/if}
+				Скачать файл
 			</Button>
-		{/snippet}
-	</DataPageHeader>
+		</div>
+	</div>
 
 	{#if errorMessage}
-		<div class="text-destructive bg-destructive/10 rounded-2xl border border-destructive/20 px-4 py-3 text-sm">{errorMessage}</div>
+		<Alert.Root variant="destructive">
+			<Alert.Description>{errorMessage}</Alert.Description>
+		</Alert.Root>
 	{/if}
 
-	{#if isLoading && !object}
-		<div class="grid gap-6 xl:grid-cols-[minmax(0,1.8fr)_minmax(20rem,0.9fr)]">
+	{#if successMessage}
+		<Alert.Root>
+			<Alert.Description>{successMessage}</Alert.Description>
+		</Alert.Root>
+	{/if}
+
+	{#if isLoading}
+		<div class="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(20rem,1fr)]">
 			<div class="space-y-6">
-				<div class="bg-card/90 rounded-[1.75rem] border border-border/60 p-6"><Skeleton class="h-7 w-64 rounded-full" /></div>
-				<div class="bg-card/90 rounded-[1.75rem] border border-border/60 p-6"><Skeleton class="h-72 w-full rounded-2xl" /></div>
+				<div class="rounded-3xl border p-6">
+					<Skeleton class="mb-4 h-8 w-2/3 rounded-full" />
+					<Skeleton class="mb-3 h-5 w-40 rounded-full" />
+					<Skeleton class="h-24 w-full rounded-2xl" />
+				</div>
+				<div class="rounded-3xl border p-6">
+					<Skeleton class="mb-4 h-6 w-32 rounded-full" />
+					<Skeleton class="h-48 w-full rounded-2xl" />
+				</div>
 			</div>
-			<div class="bg-card/90 rounded-[1.75rem] border border-border/60 p-6"><Skeleton class="h-80 w-full rounded-2xl" /></div>
+			<div class="rounded-3xl border p-6">
+				<Skeleton class="mb-4 h-6 w-28 rounded-full" />
+				<div class="space-y-3">
+					{#each [1, 2, 3, 4, 5, 6] as item (item)}
+						<Skeleton class="h-10 w-full rounded-2xl" />
+					{/each}
+				</div>
+			</div>
 		</div>
 	{:else if object}
-		<div class="grid gap-6 xl:grid-cols-[minmax(0,1.8fr)_minmax(20rem,0.9fr)]">
+		<div class="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(20rem,1fr)]">
 			<div class="space-y-6">
-				<Card.Root class="bg-card/90 rounded-[1.75rem] border-border/60 shadow-[0_20px_60px_-36px_rgba(0,0,0,0.35)]">
-					<Card.Header class="gap-4 border-b border-border/60 pb-5">
-						<div class="flex flex-wrap items-center gap-2">
-							<Card.Title class="text-lg">Сводка</Card.Title>
+				<section class="rounded-3xl border bg-card/70 p-6 shadow-sm">
+					<div class="flex flex-col gap-4">
+						<div class="flex flex-wrap items-center gap-3">
+							<h1 class="text-2xl font-semibold tracking-tight">{getObjectTitle(object)}</h1>
 							<DataStatusBadge status={object.status} />
+							<Badge variant="outline">{getObjectTypeLabel(object)}</Badge>
 						</div>
-						<Card.Description>Основная информация по загруженному объекту и его текущему состоянию.</Card.Description>
-					</Card.Header>
-					<Card.Content class="grid gap-4 pt-5 md:grid-cols-2">
-						<div>
-							<p class="text-muted-foreground text-sm">Тип</p>
-							<p class="mt-1 text-sm font-medium">{getObjectTypeLabel(object)}</p>
-						</div>
-						<div>
-							<p class="text-muted-foreground text-sm">Размер</p>
-							<p class="mt-1 text-sm font-medium">{formatBytes(object.size)}</p>
-						</div>
-						<div>
-							<p class="text-muted-foreground text-sm">Загружен</p>
-							<p class="mt-1 text-sm font-medium">{formatDateTime(object.createdAt)}</p>
-						</div>
-						<div>
-							<p class="text-muted-foreground text-sm">Обновлен</p>
-							<p class="mt-1 text-sm font-medium">{formatDateTime(object.updatedAt)}</p>
-						</div>
-						<div class="md:col-span-2">
-							<p class="text-muted-foreground text-sm">Автор</p>
-							<p class="mt-1 text-sm font-medium">{object.createdBy?.name || object.createdBy?.email || "-"}</p>
-						</div>
+
 						{#if object.errorMessage}
-							<div class="text-destructive bg-destructive/10 md:col-span-2 rounded-2xl border border-destructive/20 px-4 py-3 text-sm">
-								{object.errorMessage}
-							</div>
+							<p class="text-destructive text-sm leading-6">{object.errorMessage}</p>
 						{/if}
-					</Card.Content>
-				</Card.Root>
 
-				<Card.Root class="bg-card/90 rounded-[1.75rem] border-border/60 shadow-[0_20px_60px_-36px_rgba(0,0,0,0.35)]">
-					<Card.Header class="gap-2 border-b border-border/60 pb-5">
-						<Card.Title class="text-lg">Содержимое</Card.Title>
-						<Card.Description>
-							{#if object.status === "ready"}
-								Текст, который был извлечен из документа и доступен для поиска.
-							{:else}
-								Содержимое появится после завершения обработки.
-							{/if}
-						</Card.Description>
-					</Card.Header>
-					<Card.Content class="space-y-4 pt-5">
-						{#if object.content}
-							<pre class="bg-background/80 max-h-[32rem] overflow-auto rounded-2xl border border-border/60 p-4 text-sm leading-6 whitespace-pre-wrap break-words">{showFullContent ? object.content : contentState.text}</pre>
-							{#if contentState.truncated}
-								<Button type="button" variant="ghost" class="rounded-full" onclick={() => (showFullContent = !showFullContent)}>
-									{showFullContent ? "Свернуть" : "Показать полностью"}
-								</Button>
-							{/if}
-						{:else}
-							<div class="bg-background/70 text-muted-foreground rounded-2xl border border-border/60 px-4 py-6 text-sm">
-								{object.status === "failed"
-									? "Не удалось извлечь текст из документа."
-									: "Текст документа пока недоступен. Вероятно, объект еще обрабатывается."}
+						{#if object.tags?.length}
+							<div class="flex flex-wrap gap-2">
+								{#each object.tags as tag (tag)}
+									<Badge variant="secondary">{tag}</Badge>
+								{/each}
 							</div>
 						{/if}
 
-						{#if object.chunks?.length}
-							<div class="rounded-2xl border border-border/60 px-4 py-4">
-								<div class="flex items-center justify-between gap-3">
-									<div>
-										<p class="text-sm font-medium">Чанки</p>
-										<p class="text-muted-foreground text-sm">Подготовлено {object.chunks.length} фрагментов для поиска.</p>
-									</div>
-								</div>
-								<div class="mt-4 space-y-3">
-									{#each object.chunks.slice(0, 3) as chunk (`${chunk.index}:${chunk.text.slice(0, 20)}`)}
-										<div class="bg-background/80 rounded-2xl border border-border/60 px-4 py-3">
-											<div class="mb-2 flex items-center justify-between gap-3 text-sm">
-												<span class="font-medium">Фрагмент {chunk.index + 1}</span>
-												<span class="text-muted-foreground">{chunk.tokens ?? 0} токенов</span>
-											</div>
-											<p class="text-sm leading-6 whitespace-pre-wrap break-words">{chunk.text}</p>
-										</div>
-									{/each}
-								</div>
+						<div class="grid gap-4 text-sm text-muted-foreground sm:grid-cols-2 xl:grid-cols-3">
+							<div class="rounded-2xl border px-4 py-3">
+								<div class="text-xs uppercase tracking-wide">Размер</div>
+								<div class="mt-1 text-foreground">{formatBytes(object.size)}</div>
 							</div>
+							<div class="rounded-2xl border px-4 py-3">
+								<div class="text-xs uppercase tracking-wide">Создан</div>
+								<div class="mt-1 text-foreground">{formatDateTime(object.createdAt)}</div>
+							</div>
+							<div class="rounded-2xl border px-4 py-3">
+								<div class="text-xs uppercase tracking-wide">Обновлён</div>
+								<div class="mt-1 text-foreground">{formatDateTime(object.updatedAt)}</div>
+							</div>
+						</div>
+					</div>
+				</section>
+
+				<section class="rounded-3xl border bg-card/70 p-6 shadow-sm">
+					<div class="mb-4 flex items-center justify-between gap-3">
+						<h2 class="text-lg font-semibold">Содержимое</h2>
+						{#if contentPreview.truncated}
+							<span class="text-muted-foreground text-sm">Показан фрагмент</span>
 						{/if}
-					</Card.Content>
-				</Card.Root>
+					</div>
+
+					{#if contentPreview.text}
+						<pre class="bg-muted/50 overflow-x-auto rounded-2xl border p-4 text-sm leading-6 whitespace-pre-wrap">{contentPreview.text}</pre>
+					{:else}
+						<p class="text-muted-foreground text-sm">Текстовое содержимое пока недоступно.</p>
+					{/if}
+				</section>
+
+				{#if metadataEntries.length > 0}
+					<section class="rounded-3xl border bg-card/70 p-6 shadow-sm">
+						<h2 class="mb-4 text-lg font-semibold">Дополнительные метаданные</h2>
+						<div class="grid gap-3 sm:grid-cols-2">
+							{#each metadataEntries as [key, value] (`${key}:${value}`)}
+								<div class="rounded-2xl border px-4 py-3">
+									<div class="text-muted-foreground text-xs uppercase tracking-wide">{key}</div>
+									<div class="mt-1 break-words text-sm">{value}</div>
+								</div>
+							{/each}
+						</div>
+					</section>
+				{/if}
 			</div>
 
-			<div class="space-y-6">
-				<Card.Root class="bg-card/90 rounded-[1.75rem] border-border/60 shadow-[0_20px_60px_-36px_rgba(0,0,0,0.35)]">
-					<Card.Header class="gap-2 border-b border-border/60 pb-5">
-						<Card.Title class="text-lg">Метки и метаданные</Card.Title>
-						<Card.Description>Дополнительные данные, полезные для навигации и фильтрации.</Card.Description>
-					</Card.Header>
-					<Card.Content class="space-y-5 pt-5">
-						<div>
-							<p class="text-muted-foreground mb-2 text-sm">Теги</p>
-							{#if object.tags?.length}
-								<div class="flex flex-wrap gap-2">
-									{#each object.tags as tag (tag)}
-										<Badge variant="outline">{tag}</Badge>
-									{/each}
-								</div>
-							{:else}
-								<p class="text-sm">-</p>
-							{/if}
-						</div>
-
-						<div>
-							<p class="text-muted-foreground mb-3 text-sm">Метаданные</p>
-							{#if metadataEntries.length > 0}
-								<div class="space-y-3">
-									{#each metadataEntries as [key, value] (`${key}:${value}`)}
-										<div class="rounded-2xl border border-border/60 px-4 py-3">
-											<p class="text-muted-foreground text-sm">{key}</p>
-											<p class="mt-1 text-sm leading-6 break-words">{value}</p>
-										</div>
-									{/each}
-								</div>
-							{:else}
-								<p class="text-sm">Метаданные не переданы.</p>
-							{/if}
-						</div>
-					</Card.Content>
-				</Card.Root>
-			</div>
+			<aside class="rounded-3xl border bg-card/70 p-6 shadow-sm">
+				<h2 class="mb-4 text-lg font-semibold">Системные поля</h2>
+				<dl class="space-y-4 text-sm">
+					<div>
+						<dt class="text-muted-foreground">ID</dt>
+						<dd class="mt-1 break-all font-mono text-xs">{object.id}</dd>
+					</div>
+					<div>
+						<dt class="text-muted-foreground">Имя файла</dt>
+						<dd class="mt-1 break-words">{object.originalFilename || object.filename}</dd>
+					</div>
+					<div>
+						<dt class="text-muted-foreground">Тип</dt>
+						<dd class="mt-1">{object.type || "-"}</dd>
+					</div>
+					<div>
+						<dt class="text-muted-foreground">Content-Type</dt>
+						<dd class="mt-1 break-all">{object.contentType || object.mimeType || "-"}</dd>
+					</div>
+					<div>
+						<dt class="text-muted-foreground">Размер в байтах</dt>
+						<dd class="mt-1">{object.sizeBytes ?? "-"}</dd>
+					</div>
+					<div>
+						<dt class="text-muted-foreground">SHA-256</dt>
+						<dd class="mt-1 break-all font-mono text-xs">{object.sha256 || "-"}</dd>
+					</div>
+					<div>
+						<dt class="text-muted-foreground">Язык</dt>
+						<dd class="mt-1">{object.language || "-"}</dd>
+					</div>
+					<div>
+						<dt class="text-muted-foreground">Есть исходный файл</dt>
+						<dd class="mt-1">{getBooleanLabel(object.hasContent)}</dd>
+					</div>
+					<div>
+						<dt class="text-muted-foreground">Есть результат</dt>
+						<dd class="mt-1">{getBooleanLabel(object.hasResult)}</dd>
+					</div>
+				</dl>
+			</aside>
+		</div>
+	{:else}
+		<div class="rounded-3xl border border-dashed p-8 text-center text-sm text-muted-foreground">
+			Документ не найден.
 		</div>
 	{/if}
 </div>

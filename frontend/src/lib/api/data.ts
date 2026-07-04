@@ -95,6 +95,25 @@ type GraphBackendResponse = {
   mode: string;
 };
 
+const GRAPH_NODE_TYPES = new Set<GraphNodeType>([
+  "Material",
+  "Process",
+  "Equipment",
+  "Property",
+  "Experiment",
+  "Publication",
+  "Expert",
+  "Facility",
+  "Unknown",
+]);
+
+function toGraphNodeType(raw: string): GraphNodeType {
+  const normalized = raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
+  return GRAPH_NODE_TYPES.has(normalized as GraphNodeType)
+    ? (normalized as GraphNodeType)
+    : "Unknown";
+}
+
 export async function queryKnowledgeGraph(
   query: string,
   mode = "hybrid",
@@ -104,25 +123,11 @@ export async function queryKnowledgeGraph(
     mode,
   });
 
-  const allowedTypes = new Set<GraphNodeType>([
-    "Material",
-    "Process",
-    "Equipment",
-    "Property",
-    "Experiment",
-    "Publication",
-    "Expert",
-    "Facility",
-    "Unknown",
-  ]);
-
   return {
     nodes: response.data.nodes.map((node) => ({
       id: node.id,
       label: node.label,
-      type: (allowedTypes.has(node.type as GraphNodeType)
-        ? node.type
-        : "Unknown") as GraphNodeType,
+      type: toGraphNodeType(node.type),
     })),
     edges: response.data.edges.map((edge) => ({
       source: edge.source,

@@ -97,20 +97,31 @@ func TestEnrichResponseReferences(t *testing.T) {
 		{"id": "aea34f4a-afb9-40bf-8db4-0fb0391bfccf", "filename": "Cunico Resources.pdf", "type": "pdf", "createdAt": "2026-01-01T00:00:00Z"}
 	]`)
 
-	response := "## References\n- [1] 14bd1a61-3a2f-4936-a2bd-00c5266ac123.md\n- [3] aea34f4a-afb9-40bf-8db4-0fb0391bfccf.md\n\nSome text with 14bd1a61-3a2f-4936-a2bd-00c5266ac123."
+	response := "## References\n- [1] 14bd1a61-3a2f-4936-a2bd-00c5266ac123.md\n- [3] aea34f4a-afb9-40bf-8db4-0fb0391bfccf.md\n\nSome text with [1] and [3]."
 
-	enriched := EnrichResponseReferences(response, refs)
+	enrichedResponse, enrichedRefs := enrichResponseReferences(response, refs)
 
-	if strings.Contains(enriched, "14bd1a61-3a2f-4936-a2bd-00c5266ac123.md") {
-		t.Error("uuid.md should be replaced with filename")
+	if strings.Contains(enrichedResponse, "## References") {
+		t.Error("References block should be removed")
 	}
-	if strings.Contains(enriched, "14bd1a61-3a2f-4936-a2bd-00c5266ac123") {
-		t.Error("plain uuid should also be replaced with filename")
+	if strings.Contains(enrichedResponse, "14bd1a61-3a2f-4936-a2bd-00c5266ac123") {
+		t.Error("uuid should be replaced with filename")
 	}
-	if !strings.Contains(enriched, "Bindura_2010.pdf") {
-		t.Error("filename should appear in response")
+	if !strings.Contains(enrichedResponse, "Some text with [1] and [3].") {
+		t.Errorf("text after References block should be preserved, got:\n%s", enrichedResponse)
 	}
-	if !strings.Contains(enriched, "Cunico Resources.pdf") {
-		t.Error("second filename should appear in response")
+
+	var parsedRefs []EnrichedReference
+	if err := json.Unmarshal(enrichedRefs, &parsedRefs); err != nil {
+		t.Fatalf("failed to unmarshal enriched refs: %v", err)
+	}
+	if len(parsedRefs) != 2 {
+		t.Fatalf("expected 2 refs, got %d", len(parsedRefs))
+	}
+	if parsedRefs[0].Number != 1 {
+		t.Errorf("expected ref 0 number 1, got %d", parsedRefs[0].Number)
+	}
+	if parsedRefs[1].Number != 3 {
+		t.Errorf("expected ref 1 number 3, got %d", parsedRefs[1].Number)
 	}
 }

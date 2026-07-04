@@ -170,27 +170,73 @@ func inferProperty(query, matched string) string {
 	return "значение"
 }
 
-// EnrichResponseReferences заменяет UUID источников в тексте ответа LightRAG
-// на реальные имена файлов, используя обогащённые references.
-func EnrichResponseReferences(response string, refs json.RawMessage) string {
+// enrichResponseReferences заменяет UUID источников в тексте ответа LightRAG
+// на реальные имена файлов, сохраняет номера ссылок [N] и удаляет
+// встроенный markdown-блок References, чтобы не дублировать нижний список источников.
+func enrichResponseReferences(response string, refs json.RawMessage) (string, json.RawMessage) {
 	if len(refs) == 0 {
-		return response
+		return response, refs
 	}
 
 	var enriched []EnrichedReference
 	if err := json.Unmarshal(refs, &enriched); err != nil {
-		return response
+		return response, refs
 	}
 
-	for _, ref := range enriched {
-		if ref.Filename == "" {
+	for i := range enriched {
+		if enriched[i].Filename == "" {
 			continue
 		}
-		response = strings.ReplaceAll(response, ref.ID+".md", ref.Filename)
-		response = strings.ReplaceAll(response, ref.ID, ref.Filename)
+		response = strings.ReplaceAll(response, enriched[i].ID+".md", enriched[i].Filename)
+		response = strings.ReplaceAll(response, enriched[i].ID, enriched[i].Filename)
 	}
 
-	return response
+	assignReferenceNumbers(response, enriched)
+	response = cleanReferencesBlock(response)
+
+	updatedRefs, err := json.Marshal(enriched)
+	if err != nil {
+		return response, refs
+	}
+	return response, updatedRefs
+}
+
+// assignReferenceNumbers парсит markdown-блок References и заполняет Number
+// в enriched references, чтобы номера в тексте ответа совпадали со списком источников.
+func assignReferenceNumbers(response string, refs []EnrichedReference) {
+	reBlock := regexp.MustCompile(`(?im)^##\s*(References|Источники)\s*\n((?:^-\s.*\n?)+)`)
+	m := reBlock.FindStringSubmatch(response)
+	if m == nil {
+		return
+	}
+
+	reLine := regexp.MustCompile(`(?i)^-\s*\[(\d+)\]\s*(.+?)\s*$`)
+	numberByName := make(map[string]int)
+	for _, line := range strings.Split(m[2], "\n") {
+		lm := reLine.FindStringSubmatch(line)
+		if lm == nil {
+			continue
+		}
+		num, _ := strconv.Atoi(lm[1])
+		name := strings.TrimSpace(lm[2])
+		numberByName[name] = num
+	}
+
+	for i := range refs {
+		if num, ok := numberByName[refs[i].Filename]; ok {
+			refs[i].Number = num
+		} else if num, ok := numberByName[refs[i].ID]; ok {
+			refs[i].Number = num
+		} else if num, ok := numberByName[refs[i].ID+".md"]; ok {
+			refs[i].Number = num
+		}
+	}
+}
+
+// cleanReferencesBlock удаляет markdown-блок References из текста ответа.
+func cleanReferencesBlock(response string) string {
+	re := regexp.MustCompile(`(?im)^##\s*(References|Источники)\s*\n(?:^-\s.*\n?)+`)
+	return strings.TrimSpace(re.ReplaceAllString(response, ""))
 }
 
 func cleanProperty(s string) string {

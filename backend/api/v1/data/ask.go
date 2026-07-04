@@ -35,6 +35,7 @@ type EnrichedReference struct {
 	Filename  string    `json:"filename"`
 	Type      string    `json:"type"`
 	CreatedAt time.Time `json:"createdAt"`
+	Number    int       `json:"number,omitempty"`
 }
 
 func (a *DataAPI) ask(c *gin.Context) {
@@ -69,8 +70,9 @@ func (a *DataAPI) ask(c *gin.Context) {
 		processedReferences = resp.References
 	}
 
-	// Заменяем UUID.md в тексте ответа на реальные имена файлов.
-	enrichedResponse := EnrichResponseReferences(resp.Response, processedReferences)
+	// Заменяем UUID.md в тексте ответа на имена файлов, сохраняем номера ссылок
+	// и удаляем встроенный markdown-блок References, чтобы не дублировать список источников.
+	enrichedResponse, processedReferences := enrichResponseReferences(resp.Response, processedReferences)
 
 	// Persist query session
 	user, _ := api.CurrentUserFromContext(c)

@@ -12,6 +12,7 @@ export type Reference = {
   filename: string;
   type: string;
   createdAt: string;
+  number?: number;
 };
 
 export type AskResponse = {

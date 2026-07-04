@@ -1,5 +1,6 @@
 <script lang="ts">
     import { onMount, untrack } from 'svelte';
+    import CheckIcon from '@lucide/svelte/icons/check';
     import Trash2Icon from '@lucide/svelte/icons/trash-2';
 
     type Props = {
@@ -11,10 +12,11 @@
         itemClass?: string;
         listClass?: string;
         itemBadges?: string[][];
-        itemProgresses?: number[];
-        itemProgressLabels?: string[];
-        itemProgressClasses?: string[];
+        itemProgresses?: Array<number | undefined>;
+        itemProgressLabels?: Array<string | undefined>;
+        itemProgressClasses?: Array<string | undefined>;
         itemMessages?: string[];
+        itemSucceeded?: boolean[];
         displayScrollbar?: boolean;
         onRemove?: (index: number) => void;
         removeDisabled?: boolean;
@@ -39,6 +41,7 @@
         itemProgressLabels = [],
         itemProgressClasses = [],
         itemMessages = [],
+        itemSucceeded = [],
         onRemove,
         removeDisabled = false,
         initialSelectedIndex = -1
@@ -58,6 +61,13 @@
             });
         }
     });
+
+    function getDisplayItem(item: string): string {
+        const base = item.split('/').pop() || item;
+        const dot = base.lastIndexOf('.');
+
+        return dot > 0 ? base.slice(0, dot) : base;
+    }
 
     function handleScroll(e: Event) {
         const t = e.currentTarget as HTMLDivElement;
@@ -158,7 +168,7 @@
                 <div
                         class="flex items-center gap-3 p-4 bg-[#222] rounded-lg {selectedIndex === index ? 'al-selected' : ''} {itemClass}"
                 >
-                    <p class="text-white m-0 flex-1 truncate">{item}</p>
+                    <p class="text-white m-0 min-w-0 flex-1 truncate">{getDisplayItem(item)}</p>
                     {#if itemProgresses[index] !== undefined}
                         <div class="ml-auto w-24 shrink-0">
                             {#if itemProgressLabels[index]}
@@ -177,7 +187,14 @@
                             <span class="shrink-0 rounded-md bg-white/10 px-2 py-0.5 text-xs text-white/70">{badge}</span>
                         {/each}
                     {/if}
-                    {#if onRemove}
+                    {#if itemSucceeded[index]}
+                        <span
+                            class="flex size-7 shrink-0 items-center justify-center rounded-md bg-emerald-400/15 text-emerald-400"
+                            aria-label="Файл загружен"
+                        >
+                            <CheckIcon class="size-4" />
+                        </span>
+                    {:else if onRemove}
                         <button
                             type="button"
                             class="flex size-7 shrink-0 items-center justify-center rounded-md text-white/40 transition-colors hover:bg-white/10 hover:text-white/80 disabled:pointer-events-none disabled:opacity-40"

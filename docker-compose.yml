@@ -15,8 +15,6 @@ services:
       context: backend
     env_file:
       - .env
-    environment:
-      LIGHTRAG_SERVICE_URL: http://lightrag:9621
     restart: unless-stopped
     depends_on:
       db:
@@ -155,11 +153,7 @@ services:
       - ./lightrag/prompts:/app/data/prompts
       - ./lightrag/rag_storage:/app/data/rag_storage
     healthcheck:
-      test:
-        - CMD
-        - python
-        - -c
-        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9621/health', timeout=3)"
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9621/health', timeout=3)"]
       interval: 15s
       timeout: 5s
       retries: 20

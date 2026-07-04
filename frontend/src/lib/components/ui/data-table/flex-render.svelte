@@ -3,7 +3,6 @@
 	generics="TData, TValue, TContext extends HeaderContext<TData, TValue> | CellContext<TData, TValue>"
 >
 	import type { CellContext, ColumnDefTemplate, HeaderContext } from "@tanstack/table-core";
-	import { RenderComponentConfig, RenderSnippetConfig } from "./render-helpers.js";
 	import type { Attachment } from "svelte/attachments";
 	type Props = {
 		/** The cell or header field of the current cell's column definition. */
@@ -28,10 +27,10 @@
 	<!-- It's unlikely that a CellContext will be passed to a Header -->
 	<!-- eslint-disable-next-line @typescript-eslint/no-explicit-any -->
 	{@const result = content(context as any)}
-	{#if result instanceof RenderComponentConfig}
+	{#if result?._tag === "RenderComponentConfig"}
 		{@const { component: Component, props } = result}
 		<Component {...props} {attach} />
-	{:else if result instanceof RenderSnippetConfig}
+	{:else if result?._tag === "RenderSnippetConfig"}
 		{@const { snippet, params } = result}
 		{@render snippet({ ...params, attach })}
 	{:else}

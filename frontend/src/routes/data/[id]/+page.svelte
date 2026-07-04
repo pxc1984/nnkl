@@ -26,35 +26,7 @@
 	let isDownloading = $state(false);
 	let isReprocessing = $state(false);
 	let errorMessage = $state("");
-	let requestRun = 0;
 	let showFullContent = $state(false);
-
-	async function loadObject(id: string): Promise<void> {
-		const currentRun = ++requestRun;
-		isLoading = true;
-		errorMessage = "";
-
-		try {
-			const response = await getKnowledgeObject(id);
-			if (currentRun !== requestRun) {
-				return;
-			}
-
-			object = response;
-			showFullContent = false;
-		} catch (error) {
-			if (currentRun !== requestRun) {
-				return;
-			}
-
-			errorMessage = getApiErrorMessage(error, "Не удалось загрузить документ.");
-			object = null;
-		} finally {
-			if (currentRun === requestRun) {
-				isLoading = false;
-			}
-		}
-	}
 
 	$effect(() => {
 		const id = page.params.id;
@@ -62,7 +34,30 @@
 			return;
 		}
 
-		void loadObject(id);
+		isLoading = true;
+		errorMessage = "";
+		let cancelled = false;
+
+		getKnowledgeObject(id)
+			.then((response) => {
+				if (cancelled) return;
+				object = response;
+				showFullContent = false;
+			})
+			.catch((error) => {
+				if (cancelled) return;
+				errorMessage = getApiErrorMessage(error, "Не удалось загрузить документ.");
+				object = null;
+			})
+			.finally(() => {
+				if (!cancelled) {
+					isLoading = false;
+				}
+			});
+
+		return () => {
+			cancelled = true;
+		};
 	});
 
 	async function handleDownload(): Promise<void> {
@@ -114,9 +109,6 @@
 <div class="flex flex-col gap-8">
 	<DataPageHeader
 		title={object ? getObjectTitle(object) : "Документ"}
-		description="Карточка документа, его статус обработки и извлеченное содержимое."
-		backHref="/data"
-		backLabel="Назад к документам"
 	>
 		{#snippet actions()}
 			<Button variant="outline" class="rounded-full" disabled={!object || isReprocessing} onclick={() => void handleReprocess()}>

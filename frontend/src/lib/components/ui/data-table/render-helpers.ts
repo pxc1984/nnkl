@@ -17,6 +17,7 @@ import type { Component, ComponentProps, Snippet } from "svelte";
  * ```
  */
 export class RenderComponentConfig<TComponent extends Component> {
+  _tag = "RenderComponentConfig" as const;
   component: TComponent;
   props: ComponentProps<TComponent> | Record<string, never>;
   constructor(
@@ -44,6 +45,7 @@ export class RenderComponentConfig<TComponent extends Component> {
  * ```
  */
 export class RenderSnippetConfig<TProps> {
+  _tag = "RenderSnippetConfig" as const;
   snippet: Snippet<[TProps]>;
   params: TProps;
   constructor(snippet: Snippet<[TProps]>, params: TProps) {

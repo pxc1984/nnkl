@@ -16,6 +16,9 @@ importers:
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
+      cytoscape:
+        specifier: ^3.34.0
+        version: 3.34.0
       jszip:
         specifier: ^3.10.1
         version: 3.10.1
@@ -53,6 +56,9 @@ importers:
       "@tsconfig/svelte":
         specifier: ^5.0.8
         version: 5.0.8
+      "@types/cytoscape":
+        specifier: ^3.31.0
+        version: 3.31.0
       "@types/node":
         specifier: ^24.12.3
         version: 24.13.0
@@ -943,6 +949,13 @@ packages:
         integrity: sha512-4Kh9a6B2bQciAhf7FSuMRRkUWecJgJu9nPnx3yzpsfXX/c50REIqpHY4C82bXP90qrLtXtkDxTZosYO3UpOwlA==,
       }
 
+  "@types/cytoscape@3.31.0":
+    resolution:
+      {
+        integrity: sha512-EXHOHxqQjGxLDEh5cP4te6J0bi7LbCzmZkzsR6f703igUac8UGMdEohMyU3GHAayCTZrLQOMnaE/lqB2Ekh8Ww==,
+      }
+    deprecated: This is a stub types definition. cytoscape provides its own type definitions, so you do not need this installed.
+
   "@types/esrecurse@4.3.1":
     resolution:
       {
@@ -1214,6 +1227,13 @@ packages:
       {
         integrity: sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ==,
       }
+
+  cytoscape@3.34.0:
+    resolution:
+      {
+        integrity: sha512-62rNSrioXw93uliKFBwjukeQyeWwH2PqDrTac31r2P6464u3AUvTk0xS4LVvT251g7IgkFunrI48ZEZGjywSOg==,
+      }
+    engines: { node: ">=0.10" }
 
   debug@4.4.3:
     resolution:
@@ -2917,6 +2937,10 @@ snapshots:
 
   "@types/cookie@0.6.0": {}
 
+  "@types/cytoscape@3.31.0":
+    dependencies:
+      cytoscape: 3.34.0
+
   "@types/esrecurse@4.3.1": {}
 
   "@types/estree@1.0.9": {}
@@ -3106,6 +3130,8 @@ snapshots:
   cssesc@3.0.0: {}
 
   csstype@3.2.3: {}
+
+  cytoscape@3.34.0: {}
 
   debug@4.4.3:
     dependencies:

@@ -64,85 +64,101 @@
 	}
 </script>
 
-<div class="flex flex-col gap-6">
-	<div class="flex items-center gap-4">
-		<Button variant="outline" size="icon" onclick={goBack}>
+<div class="mx-auto flex w-full max-w-5xl flex-col">
+	<div class="mb-10 flex items-center gap-4">
+		<Button variant="ghost" size="icon" onclick={goBack}>
 			<ArrowLeftIcon class="size-4" />
 		</Button>
-		<h1 class="text-2xl font-bold">Сессия запроса</h1>
+
+		<h1 class="text-2xl font-semibold tracking-tight">
+			Сессия запроса
+		</h1>
 	</div>
 
 	{#if isLoading}
-		<div class="grid gap-6 xl:grid-cols-[minmax(0,1.8fr)_minmax(20rem,0.9fr)]">
-			<div class="space-y-6">
-				<div class="bg-card/90 rounded-[1.75rem] border border-border/60 p-6">
-					<Skeleton class="h-7 w-64 rounded-full mb-4" />
-					<Skeleton class="h-4 w-full rounded-full mb-2" />
+		<div class="grid gap-12 xl:grid-cols-[minmax(0,1fr)_18rem]">
+			<div class="space-y-10">
+				<div>
+					<Skeleton class="mb-4 h-6 w-32 rounded-full" />
+					<Skeleton class="mb-2 h-4 w-full rounded-full" />
 					<Skeleton class="h-4 w-3/4 rounded-full" />
 				</div>
-				<div class="bg-card/90 rounded-[1.75rem] border border-border/60 p-6">
-					<Skeleton class="h-7 w-64 rounded-full mb-4" />
-					<Skeleton class="h-32 w-full rounded-2xl" />
+
+				<div>
+					<Skeleton class="mb-4 h-6 w-32 rounded-full" />
+					<Skeleton class="h-48 w-full rounded-2xl" />
 				</div>
 			</div>
-			<div class="bg-card/90 rounded-[1.75rem] border border-border/60 p-6">
-				<Skeleton class="h-80 w-full rounded-2xl" />
+
+			<div>
+				<Skeleton class="h-72 w-full rounded-2xl" />
 			</div>
 		</div>
 	{:else if errorMessage}
-		<div class="text-destructive bg-destructive/10 rounded-2xl border border-destructive/20 px-4 py-3 text-sm">
+		<div class="rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
 			{errorMessage}
 		</div>
 	{:else if session}
-		<div class="grid gap-6 xl:grid-cols-[minmax(0,1.8fr)_minmax(20rem,0.9fr)]">
-			<div class="space-y-6">
-				<Card.Root class="bg-card/90 rounded-[1.75rem] border-border/60 shadow-[0_20px_60px_-36px_rgba(0,0,0,0.35)]">
-					<Card.Header class="gap-4 border-b border-border/60 pb-5">
-						<div class="flex flex-wrap items-center gap-2">
-							<Card.Title class="text-lg">Запрос</Card.Title>
-						</div>
-					</Card.Header>
-					<Card.Content class="pt-5">
-						<p class="whitespace-pre-wrap break-words">{session.query}</p>
-					</Card.Content>
-				</Card.Root>
+		<div class="grid gap-12 xl:grid-cols-[minmax(0,1fr)_18rem]">
+			<div class="space-y-12">
 
-				<Card.Root class="bg-card/90 rounded-[1.75rem] border-border/60 shadow-[0_20px_60px_-36px_rgba(0,0,0,0.35)]">
-					<Card.Header class="gap-2 border-b border-border/60 pb-5">
-						<Card.Title class="text-lg">Ответ</Card.Title>
-					</Card.Header>
-					<Card.Content class="space-y-4 pt-5">
-						<div class="bg-background/80 max-h-[32rem] overflow-auto rounded-2xl border border-border/60 p-4 text-sm leading-6 whitespace-pre-wrap break-words">
-							{session.answer}
-						</div>
-					</Card.Content>
-				</Card.Root>
+				<section>
+					<h2 class="mb-4 text-lg font-medium">
+						Запрос
+					</h2>
+
+					<p class="whitespace-pre-wrap leading-7 break-words text-foreground">
+						{session.query}
+					</p>
+				</section>
+
+				<section>
+					<h2 class="mb-6 text-lg font-medium">
+						Ответ
+					</h2>
+
+					<div class="prose prose-neutral dark:prose-invert max-w-none whitespace-pre-wrap leading-7 break-words">
+						{session.answer}
+					</div>
+				</section>
+
 			</div>
 
-			<div class="space-y-6">
-				<Card.Root class="bg-card/90 rounded-[1.75rem] border-border/60 shadow-[0_20px_60px_-36px_rgba(0,0,0,0.35)]">
-					<Card.Header class="gap-2 border-b border-border/60 pb-5">
-						<Card.Title class="text-lg">Информация о сессии</Card.Title>
-						<Card.Description>Дополнительные данные о запросе.</Card.Description>
-					</Card.Header>
-					<Card.Content class="space-y-5 pt-5">
-						<div>
-							<p class="text-muted-foreground mb-2 text-sm">Время</p>
-							<p class="text-sm">{session.time}</p>
-						</div>
+			<aside class="h-fit rounded-2xl border border-border/20 bg-muted/20 p-5">
+				<h2 class="mb-6 text-base font-medium">
+					Информация
+				</h2>
 
-						<div>
-							<p class="text-muted-foreground mb-2 text-sm">Режим</p>
-							<p class="text-sm">{session.mode || "naive"}</p>
-						</div>
+				<div class="space-y-6 text-sm">
 
-						<div>
-							<p class="text-muted-foreground mb-2 text-sm">ID сессии</p>
-							<p class="text-sm font-mono break-all">{session.id}</p>
-						</div>
-					</Card.Content>
-				</Card.Root>
-			</div>
+					<div>
+						<p class="mb-1 text-muted-foreground">
+							Время
+						</p>
+
+						<p>{session.time}</p>
+					</div>
+
+					<div>
+						<p class="mb-1 text-muted-foreground">
+							Режим
+						</p>
+
+						<p>{session.mode || "naive"}</p>
+					</div>
+
+					<div>
+						<p class="mb-1 text-muted-foreground">
+							ID сессии
+						</p>
+
+						<p class="font-mono break-all text-xs">
+							{session.id}
+						</p>
+					</div>
+
+				</div>
+			</aside>
 		</div>
 	{/if}
 </div>

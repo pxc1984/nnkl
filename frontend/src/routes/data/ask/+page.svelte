@@ -6,6 +6,8 @@
 	import {askQuestion, type AskResponse, type Reference} from "$lib/api/ask";
 	import {getApiErrorMessage} from "$lib/api/auth";
 	import {goto} from "$app/navigation";
+	import {resolve} from "$app/paths";
+	import {SvelteSet} from "svelte/reactivity";
 
 	let prompt = $state("");
 	let useDomesticSources = $state(false);
@@ -64,7 +66,7 @@
 	function getDocumentLinks(): Array<Reference & { link: string }> {
 		if (!answer?.references) return [];
 
-		let refsArray: any[] = [];
+		let refsArray: Reference[] = [];
 		if (typeof answer.references === 'string') {
 			try {
 				const parsed = JSON.parse(answer.references);
@@ -79,7 +81,7 @@
 		}
 
 		const uuidRe = /[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/i;
-		const seen = new Set<string>();
+		const seen = new SvelteSet<string>();
 		const result: Array<Reference & { link: string }> = [];
 
 		for (const ref of refsArray) {
@@ -121,43 +123,42 @@
 	function goToDocument(id: string) {
 		// Validate the ID before navigating
 		if (isValidDocumentId(id)) {
-			void goto(`/data/${id}`);
+			void goto(resolve(`/data/${id}`));
 		} else {
 			console.warn(`Invalid document ID: ${id}`);
 		}
 	}
 </script>
 
-<main class="flex flex-1 px-4 pb-6 pt-2 md:px-8 md:pb-8">
-	<section class="mx-auto flex w-full max-w-5xl flex-1 flex-col">
-		<div class="flex flex-1 flex-col gap-6">
+<main class="flex flex-1 px-4 py-6">
+	<section class="mx-auto flex w-full max-w-3xl flex-1 flex-col">
+		<div class="flex flex-1 flex-col">
 			{#if answer}
-				<div class="bg-card/90 flex-1 rounded-[2rem] border border-border/60 px-5 py-6 shadow-[0_24px_80px_-32px_rgba(0,0,0,0.45)] backdrop-blur md:px-8 md:py-8">
-					<div class="mb-6 flex items-center justify-between gap-3 border-b border-border/60 pb-4">
-						<div>
-							<p class="text-sm font-medium text-foreground">Ответ базы знаний</p>
-							<p class="text-muted-foreground text-sm">Одноразовый запрос с сохранением сессии</p>
-						</div>
-						<span class="rounded-full border border-border/60 bg-muted px-2.5 py-1 text-xs text-muted-foreground">{answer.mode}</span>
-					</div>
+				<div class="flex-1 px-2 py-10 md:px-4">
 					<MarkdownRenderer markdown={answer.answer} />
-					
-					<!-- Display references as clickable links -->
+
 					{#if getDocumentLinks().length > 0}
-						<div class="mt-6 pt-4 border-t border-border/60">
-							<h3 class="text-sm font-medium text-foreground mb-3">Источники:</h3>
+						<div class="mt-10 border-t border-border/20 pt-6">
+							<h3 class="mb-3 text-sm font-medium text-muted-foreground">
+								Источники
+							</h3>
+
 							<div class="flex flex-wrap gap-2">
-								{#each getDocumentLinks() as ref}
+								{#each getDocumentLinks() as ref (ref.id)}
 									<button
-										type="button"
-										onclick={() => goToDocument(ref.id)}
-										class="inline-flex max-w-full items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary transition-colors hover:bg-primary/20"
-										title={ref.filename || ref.id}
+											type="button"
+											onclick={() => goToDocument(ref.id)}
+											class="inline-flex items-center gap-2 rounded-full border border-border/30 bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted"
 									>
-										<FileTextIcon class="size-3.5 shrink-0" />
-										<span class="truncate">{ref.filename || `Документ ${ref.id.substring(0, 8)}...`}</span>
+										<FileTextIcon class="size-3.5" />
+										<span class="truncate">
+											{ref.filename || `Документ ${ref.id.substring(0, 8)}...`}
+										</span>
+
 										{#if ref.type}
-											<span class="shrink-0 opacity-70">· {ref.type}</span>
+											<span class="opacity-60">
+												· {ref.type}
+											</span>
 										{/if}
 									</button>
 								{/each}
@@ -166,10 +167,13 @@
 					{/if}
 				</div>
 			{:else}
-				<div class="flex flex-1 items-center justify-center rounded-[2rem] px-6 py-16 text-center shadow-[0_24px_80px_-32px_rgba(0,0,0,0.35)] backdrop-blur">
-					<div class="max-w-2xl space-y-4">
-						<p class="text-muted-foreground text-sm tracking-[0.24em] uppercase">Поиск по базе знаний</p>
-						<h1 class="text-foreground text-3xl font-semibold tracking-tight md:text-5xl">
+				<div class="flex flex-1 items-center justify-center py-20">
+					<div class="space-y-3 text-center">
+						<p class="text-xs font-medium uppercase tracking-[0.24em] text-muted-foreground">
+							Поиск по базе знаний
+						</p>
+
+						<h1 class="text-4xl font-medium tracking-tight text-foreground md:text-5xl">
 							Что у вас сегодня на уме?
 						</h1>
 					</div>
@@ -177,51 +181,47 @@
 			{/if}
 
 			{#if errorMessage}
-				<div class="w-full rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+				<div class="mt-6 rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
 					{errorMessage}
 				</div>
 			{/if}
 		</div>
 
-		<div class="sticky bottom-0 pt-6">
-			<div class="border-border/60 bg-background/80 rounded-[1.5rem] border px-4 py-4 md:px-5">
+		<div class="sticky bottom-4 mt-8">
+			<div class="rounded-3xl border border-border/20 bg-background px-5 py-4 shadow-sm">
 				<textarea
-					bind:value={prompt}
-					onkeydown={handleKeyDown}
-					rows="3"
-					placeholder="Какие способы закачки шахтных вод в глубокие горизонты применялись в России и за рубежом, и каковы их технико-экономические показатели?"
-					class="text-foreground placeholder:text-muted-foreground field-sizing-content min-h-24 w-full resize-none border-0 bg-transparent px-0 py-0 text-base leading-7 shadow-none outline-none focus-visible:border-0 focus-visible:ring-0 md:text-lg"
+						bind:value={prompt}
+						onkeydown={handleKeyDown}
+						rows="3"
+						placeholder="Какие способы закачки шахтных вод в глубокие горизонты применялись в России и за рубежом, и каковы их технико-экономические показатели?"
+						class="field-sizing-content min-h-32 w-full resize-none border-0 bg-transparent p-0 text-[17px] leading-7 text-foreground placeholder:text-muted-foreground outline-none focus-visible:ring-0"
 				></textarea>
 
-				<div class="mt-4 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-					<div class="flex flex-wrap gap-3">
-						<button
+				<div class="mt-3 flex items-center justify-between">
+					<button
 							type="button"
 							class={useDomesticSources
-								? "from-white via-blue-500 to-red-500 text-black inline-flex items-center gap-2 rounded-full bg-linear-to-r px-3 py-2 text-sm transition-colors"
-								: "bg-muted text-muted-foreground hover:bg-muted/80 inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm transition-colors"}
+							? "inline-flex items-center gap-2 rounded-full bg-foreground px-3 py-2 text-sm text-background transition-colors"
+							: "inline-flex items-center gap-2 rounded-full bg-muted px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/80"}
 							onclick={() => (useDomesticSources = !useDomesticSources)}
-						>
-							<GlobeIcon class="size-4" />
-							{useDomesticSources ? "Отечественные источники" : "Все источники"}
-						</button>
-					</div>
+					>
+						<GlobeIcon class="size-4" />
+						{useDomesticSources ? "Отечественные источники" : "Все источники"}
+					</button>
 
-					<div class="flex items-center justify-end gap-3">
-						<Button
+					<Button
 							type="button"
 							size="icon"
-							class="rounded-full"
+							class="h-10 w-10 rounded-full"
 							disabled={!prompt.trim() || isLoading}
 							onclick={handleSubmit}
-						>
-							{#if isLoading}
-								<span class="size-4 animate-spin rounded-full border-2 border-current border-t-transparent"></span>
-							{:else}
-								<ArrowUpIcon class="size-4" />
-							{/if}
-						</Button>
-					</div>
+					>
+						{#if isLoading}
+							<span class="size-4 animate-spin rounded-full border-2 border-current border-t-transparent"></span>
+						{:else}
+							<ArrowUpIcon class="size-4" />
+						{/if}
+					</Button>
 				</div>
 			</div>
 		</div>

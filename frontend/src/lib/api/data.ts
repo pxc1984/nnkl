@@ -36,15 +36,18 @@ type ListKnowledgeObjectsBackendResponse = {
 export async function listKnowledgeObjects(
   params: DataListParams,
 ): Promise<PaginatedKnowledgeObjectList> {
-  const response = await api.get<ListKnowledgeObjectsBackendResponse>("/api/v1/data", {
-    params: {
-      page: params.page,
-      pageSize: params.pageSize,
-      query: params.query,
-      type: params.type,
-      tags: params.tags,
+  const response = await api.get<ListKnowledgeObjectsBackendResponse>(
+    "/api/v1/data",
+    {
+      params: {
+        page: params.page,
+        pageSize: params.pageSize,
+        query: params.query,
+        type: params.type,
+        tags: params.tags,
+      },
     },
-  });
+  );
 
   const meta = response.data.meta ?? {
     page: params.page ?? 1,

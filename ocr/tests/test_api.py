@@ -120,15 +120,18 @@ class TestParseEndpoint:
         ocr_service = mock_get_ocr_service.return_value
         ocr_service.convert.return_value = ("parsed content", None)
 
-        with patch("app.use_cases.parse_document.should_use_native_pdf_text", return_value=False):
+        with patch(
+            "app.use_cases.parse_document.should_use_native_pdf_text",
+            return_value=False,
+        ):
             response = client.post(
-            "/api/v1/parse",
-            json={
-                "document_id": "doc-1",
-                "input_blob_id": blob_id,
-                "language": "auto",
-            },
-        )
+                "/api/v1/parse",
+                json={
+                    "document_id": "doc-1",
+                    "input_blob_id": blob_id,
+                    "language": "auto",
+                },
+            )
 
         assert response.status_code == 201
         data = response.json()
@@ -166,15 +169,18 @@ class TestStatusAndResultEndpoints:
         ocr_service = mock_get_ocr_service.return_value
         ocr_service.convert.return_value = ("# markdown", None)
 
-        with patch("app.use_cases.parse_document.should_use_native_pdf_text", return_value=False):
+        with patch(
+            "app.use_cases.parse_document.should_use_native_pdf_text",
+            return_value=False,
+        ):
             parse_response = client.post(
-            "/api/v1/parse",
-            json={
-                "document_id": document_id,
-                "input_blob_id": blob_id,
-                "language": "en",
-            },
-        )
+                "/api/v1/parse",
+                json={
+                    "document_id": document_id,
+                    "input_blob_id": blob_id,
+                    "language": "en",
+                },
+            )
         assert parse_response.status_code == 201
 
         status_response = client.get(f"/api/v1/status/{document_id}")

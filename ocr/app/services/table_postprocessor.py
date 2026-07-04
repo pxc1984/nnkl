@@ -60,15 +60,15 @@ def postprocess_markdown_tables(markdown: str) -> str:
     cleaned = clean_markdown(markdown)
 
     def replace_html_cell(match: re.Match[str]) -> str:
-        return f"{match.group(1)}{postprocess_table_cell(match.group(2))}{match.group(3)}"
+        return (
+            f"{match.group(1)}{postprocess_table_cell(match.group(2))}{match.group(3)}"
+        )
 
     cleaned = _HTML_CELL_RE.sub(replace_html_cell, cleaned)
 
     lines = cleaned.splitlines()
     table_line_indexes = {
-        index
-        for index, line in enumerate(lines)
-        if _MARKDOWN_SEPARATOR_RE.match(line)
+        index for index, line in enumerate(lines) if _MARKDOWN_SEPARATOR_RE.match(line)
     }
     for separator_index in table_line_indexes:
         for index in (separator_index - 1, *range(separator_index + 1, len(lines))):

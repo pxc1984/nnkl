@@ -91,7 +91,9 @@ class OCRService:
 
         working_path = file_path
         if needs_ocr and self._preprocess_scans:
-            working_path = self._preprocess_scan(file_path, correlation_id=correlation_id)
+            working_path = self._preprocess_scan(
+                file_path, correlation_id=correlation_id
+            )
             if progress_callback:
                 progress_callback(10, "preprocessing")
 
@@ -164,9 +166,7 @@ class OCRService:
                 expected_pixels = page.rect.width * scale * page.rect.height * scale
                 if expected_pixels > self._max_page_pixels:
                     scale *= (self._max_page_pixels / expected_pixels) ** 0.5
-                pixmap = page.get_pixmap(
-                    matrix=fitz.Matrix(scale, scale), alpha=False
-                )
+                pixmap = page.get_pixmap(matrix=fitz.Matrix(scale, scale), alpha=False)
                 target = rasterized.new_page(
                     width=page.rect.width, height=page.rect.height
                 )
@@ -181,6 +181,7 @@ class OCRService:
             rasterized.save(output_path, garbage=4, deflate=True)
 
         return output_path
+
     def _run_mineru(
         self,
         input_path: Path,
@@ -266,22 +267,22 @@ def _read_with_encoding_handling(path: Path) -> str:
     """Read file with proper encoding handling to fix character encoding issues."""
     # Try UTF-8 first (most common)
     try:
-        return path.read_text(encoding='utf-8')
+        return path.read_text(encoding="utf-8")
     except UnicodeDecodeError:
         # If UTF-8 fails, try other common encodings
         try:
-            return path.read_text(encoding='cp1251')  # Windows Cyrillic
+            return path.read_text(encoding="cp1251")  # Windows Cyrillic
         except UnicodeDecodeError:
             try:
-                return path.read_text(encoding='latin-1')  # Fallback
+                return path.read_text(encoding="latin-1")  # Fallback
             except UnicodeDecodeError:
                 # Last resort: read as binary and decode with error handling
                 raw_bytes = path.read_bytes()
                 # Try to detect encoding and handle errors gracefully
                 try:
-                    return raw_bytes.decode('utf-8', errors='replace')
+                    return raw_bytes.decode("utf-8", errors="replace")
                 except UnicodeDecodeError:
-                    return raw_bytes.decode('cp1251', errors='replace')
+                    return raw_bytes.decode("cp1251", errors="replace")
 
 
 def _collect_images(source_dir: Path, results_dir: Path | None) -> Path | None:
@@ -309,6 +310,8 @@ def _detect_scan_quality(pdf_path: Path) -> bool:
         return not analyze_pdf(pdf_path).supports_native_extraction()
     except Exception:  # noqa: BLE001
         return True
+
+
 _ocr_service_instance: OCRService | None = None
 
 

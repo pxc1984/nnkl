@@ -46,6 +46,8 @@ class TestScanDetection:
 
     def test_sanitize_extracted_text_removes_nul_and_controls(self) -> None:
         assert sanitize_extracted_text("abc\x00def\x1bghi\n\tjkl") == "abcdefghi\n\tjkl"
+
+
 class TestPDFQualityRouting:
     def test_mixed_pdf_requires_ocr(self, tmp_path: Path) -> None:
         import fitz
@@ -103,6 +105,8 @@ class TestConservativeMarkdownCleanup:
         result = postprocess_markdown_tables(markdown)
         assert "1234.5" in result
         assert "450 МПа" in result
+
+
 class TestMinerULanguageMapping:
     def test_language_mapping_matches_mineru_cli(self) -> None:
         from app.services.ocr_service import _MINERU_LANG_MAP

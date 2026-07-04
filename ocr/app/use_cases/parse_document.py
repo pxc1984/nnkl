@@ -24,6 +24,7 @@ from app.use_cases.document_extractor import (
 
 logger = structlog.get_logger(__name__)
 
+
 class InputBlobNotFoundError(Exception):
     """Raised when the requested shared input blob does not exist."""
 
@@ -170,6 +171,7 @@ def _parse_input_document(
 
     content = extract_native_document_text(input_path)
     return content, None
+
 
 def _pack_assets(image_dir: Path | None) -> bytes | None:
     if image_dir is None or not image_dir.exists() or not any(image_dir.iterdir()):

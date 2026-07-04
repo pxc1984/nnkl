@@ -79,7 +79,7 @@
         <div class="border-t p-4">
           <p class="mb-2 text-xs font-medium text-muted-foreground">Легенда</p>
           <div class="grid grid-cols-2 gap-2">
-            {#each nodeTypeEntries as [type, color]}
+            {#each nodeTypeEntries as [type, color] (type)}
               <div class="flex items-center gap-2">
                 <span class="inline-block size-2.5 rounded-full" style="background-color: {color}"></span>
                 <span class="text-xs text-muted-foreground">{type}</span>

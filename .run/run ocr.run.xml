@@ -1,0 +1,39 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="run ocr" type="ShConfigurationType">
+    <option name="SCRIPT_TEXT" value="uv run --no-dev uvicorn app.main:app --host 0.0.0.0 --port 8000" />
+    <option name="INDEPENDENT_SCRIPT_PATH" value="true" />
+    <option name="SCRIPT_PATH" value="" />
+    <option name="SCRIPT_OPTIONS" value="" />
+    <option name="INDEPENDENT_SCRIPT_WORKING_DIRECTORY" value="true" />
+    <option name="SCRIPT_WORKING_DIRECTORY" value="$PROJECT_DIR$/ocr" />
+    <option name="INDEPENDENT_INTERPRETER_PATH" value="true" />
+    <option name="INTERPRETER_PATH" value="/usr/bin/zsh" />
+    <option name="INTERPRETER_OPTIONS" value="" />
+    <option name="EXECUTE_IN_TERMINAL" value="true" />
+    <option name="EXECUTE_SCRIPT_FILE" value="false" />
+    <envs>
+      <env name="ACCESS_TOKEN_TTL" value="15m" />
+      <env name="AUTH_SECRET" value="change-me-in-production" />
+      <env name="GIN_MODE" value="debug" />
+      <env name="HOST" value="0.0.0.0" />
+      <env name="LOG_LEVEL" value="INFO" />
+      <env name="MAX_UPLOAD_SIZE_MB" value="50" />
+      <env name="OCR_API_PREFIX" value="/api/v1" />
+      <env name="OCR_DOCLING_DO_FORMULA_ENRICHMENT" value="true" />
+      <env name="OCR_DOCLING_USE_GPU" value="true" />
+      <env name="OCR_LOG_LEVEL" value="INFO" />
+      <env name="OCR_SERVICE_URL" value="http://ocr:8000/api/v1" />
+      <env name="OCR_TEMP_DIR" value="/tmp/ocr" />
+      <env name="PORT" value="8080" />
+      <env name="POSTGRES_DB" value="db" />
+      <env name="POSTGRES_HOST" value="localhost" />
+      <env name="POSTGRES_PASSWORD" value="admin" />
+      <env name="POSTGRES_PORT" value="5432" />
+      <env name="POSTGRES_SSLMODE" value="disable" />
+      <env name="POSTGRES_USER" value="admin" />
+      <env name="REFRESH_TOKEN_TTL" value="720h" />
+      <env name="STORE_BACKEND" value="postgres" />
+    </envs>
+    <method v="2" />
+  </configuration>
+</component>

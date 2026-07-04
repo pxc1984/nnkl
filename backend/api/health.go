@@ -26,9 +26,9 @@ func HealthCheck(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusOK, gin.H{
-		"status":         "healthy",
-		"store":          st.Backend(),
-		"database":       "up",
+		"status":          "healthy",
+		"store":           st.Backend(),
+		"database":        "up",
 		"maxUploadSizeMB": utils.Settings.MaxUploadSizeMB,
 	})
 }

@@ -27,17 +27,24 @@ type SessionResponse struct {
 }
 
 func ToUserResponse(user *models.User) UserResponse {
-	return UserResponse{
+	resp := UserResponse{
 		ID:            user.ID,
 		Email:         user.Email,
 		Name:          user.Name,
 		Role:          user.Role,
 		EmailVerified: user.EmailVerified,
-		AvatarURL:     user.AvatarURL,
 		LastLoginAt:   user.LastLoginAt,
 		CreatedAt:     user.CreatedAt,
 		UpdatedAt:     user.UpdatedAt,
 	}
+	// If avatar data is stored locally, derive the public URL from the serving endpoint.
+	if len(user.AvatarData) > 0 {
+		avatarURL := "/api/v1/user/" + user.ID + "/avatar"
+		resp.AvatarURL = &avatarURL
+	} else {
+		resp.AvatarURL = user.AvatarURL
+	}
+	return resp
 }
 
 func ToSessionResponses(sessions []models.Session) []SessionResponse {

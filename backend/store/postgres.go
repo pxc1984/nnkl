@@ -114,6 +114,23 @@ func (s *PostgresStore) UpdateUserLastLogin(ctx context.Context, userID string, 
 		Updates(map[string]any{"last_login_at": lastLoginAt, "updated_at": lastLoginAt}).Error
 }
 
+func (s *PostgresStore) UpdateUser(ctx context.Context, userID string, params models.UpdateUserParams) (*models.User, error) {
+	updates := map[string]any{"updated_at": time.Now().UTC()}
+	if params.Name != nil {
+		updates["name"] = *params.Name
+	}
+	if params.AvatarData != nil {
+		updates["avatar_data"] = params.AvatarData
+	}
+	if params.AvatarURL != nil {
+		updates["avatar_url"] = *params.AvatarURL
+	}
+	if err := s.db.WithContext(ctx).Model(&models.User{}).Where("id = ?", userID).Updates(updates).Error; err != nil {
+		return nil, err
+	}
+	return s.GetUserByID(ctx, userID)
+}
+
 func (s *PostgresStore) CreateSession(ctx context.Context, params models.CreateSessionParams) (*models.Session, error) {
 	session := &models.Session{
 		ID:               uuid.NewString(),

@@ -16,6 +16,7 @@ type Store interface {
 	Close() error
 	CountUsers(context.Context) (int64, error)
 	CreateUser(context.Context, models.CreateUserParams) (*models.User, error)
+	UpdateUser(context.Context, string, models.UpdateUserParams) (*models.User, error)
 	GetUserByEmail(context.Context, string) (*models.User, error)
 	GetUserByID(context.Context, string) (*models.User, error)
 	UpdateUserLastLogin(context.Context, string, time.Time) error

@@ -45,7 +45,7 @@
         user: {
             name: "Владимир Потанин",
             email: "potanin@nornickel.ru",
-            avatar: "/potanin.jpg",
+            avatar: undefined,
         },
         navMain: [
             {
@@ -76,12 +76,12 @@
             },
             {
                 title: "Документация",
-                url: "#",
+                url: "https://github.com/pxc1984/nnkl",
                 icon: BookOpenIcon,
                 items: [
                     {
                         title: "Техническое задание",
-                        url: "#",
+                        url: "https://nornickel-ai-hackathon.ru/task-2",
                     },
                     {
                         title: "Быстрый старт",
@@ -100,10 +100,6 @@
                 items: [
                     {
                         title: "Общие",
-                        url: "#",
-                    },
-                    {
-                        title: "Доступы",
                         url: "#",
                     },
                 ],
@@ -194,7 +190,7 @@
             ? {
                 name: currentUser.name?.trim() || currentUser.email,
                 email: currentUser.email,
-                avatar: currentUser.avatarUrl || "/potanin.jpg",
+                avatar: currentUser.avatarUrl ?? undefined,
             }
             : appSidebarData.user,
     );

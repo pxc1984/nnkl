@@ -24,4 +24,9 @@ func RegisterAuthRoutes(router gin.IRouter) {
 	protected.POST("/logout-all", a.logoutAll)
 	protected.GET("/sessions", a.sessions)
 	protected.GET("/me", a.me)
+	protected.PATCH("/me", a.updateMe)
+	protected.GET("/me/avatar", a.getAvatar)
+
+	// Public avatar serving — unauthenticated so browsers can load it in <img> tags.
+	router.GET("/user/:id/avatar", a.getUserAvatar)
 }

@@ -116,6 +116,28 @@ func (s *InMemoryStore) UpdateUserLastLogin(_ context.Context, userID string, la
 	return nil
 }
 
+func (s *InMemoryStore) UpdateUser(_ context.Context, userID string, params models.UpdateUserParams) (*models.User, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	user, ok := s.users[userID]
+	if !ok {
+		return nil, gorm.ErrRecordNotFound
+	}
+	now := time.Now().UTC()
+	if params.Name != nil {
+		user.Name = *params.Name
+	}
+	if params.AvatarData != nil {
+		user.AvatarData = params.AvatarData
+	}
+	if params.AvatarURL != nil {
+		user.AvatarURL = params.AvatarURL
+	}
+	user.UpdatedAt = now
+	s.users[userID] = user
+	return cloneUser(user), nil
+}
+
 func (s *InMemoryStore) CreateSession(_ context.Context, params models.CreateSessionParams) (*models.Session, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -526,6 +548,7 @@ func (s *InMemoryStore) ListQuerySessions(_ context.Context, userID string, para
 
 func cloneUser(user models.User) *models.User {
 	clone := user
+	clone.AvatarData = append([]byte(nil), user.AvatarData...)
 	return &clone
 }
 

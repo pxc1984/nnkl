@@ -26,7 +26,7 @@
 </script>
 
 <Sidebar.Group>
-	<Sidebar.Menu>
+	<Sidebar.Menu class="gap-2">
 		{#each items as mainItem (mainItem.title)}
 			{@const Icon = mainItem.icon}
 			<Collapsible.Root open={mainItem.isActive}>
@@ -65,7 +65,7 @@
 								{/snippet}
 							</Collapsible.Trigger>
 							<Collapsible.Content>
-								<Sidebar.MenuSub>
+								<Sidebar.MenuSub class="gap-1">
 									{#each mainItem.items as subItem (subItem.title)}
 										<Sidebar.MenuSubItem>
 										{#if subItem.url === "#"}

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { browser } from "$app/environment";
 	import { page } from "$app/state";
+	import { onMount } from "svelte";
 	import { getApiErrorMessage } from "$lib/api/auth";
 	import { downloadKnowledgeObject, getKnowledgeObject, reprocessKnowledgeObject } from "$lib/api/data";
 	import DataPageHeader from "$lib/components/data/data-page-header.svelte";
@@ -29,10 +30,19 @@
 	let isReprocessing = $state(false);
 	let errorMessage = $state("");
 	let showFullContent = $state(false);
+	let isMounted = $state(false);
+
+	onMount(() => {
+		isMounted = true;
+
+		return () => {
+			isMounted = false;
+		};
+	});
 
 	$effect(() => {
 		const id = page.params.id;
-		if (!browser || !id) {
+		if (!browser || !isMounted || !id) {
 			return;
 		}
 

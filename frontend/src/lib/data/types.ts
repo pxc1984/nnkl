@@ -33,6 +33,7 @@ export type KnowledgeObject = {
   sha256?: string;
   hasContent?: boolean;
   hasResult?: boolean;
+  outputFormat?: string;
   language?: string | null;
 };
 

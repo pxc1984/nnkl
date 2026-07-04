@@ -28,6 +28,7 @@ type KnowledgeObjectDetails struct {
 	HasContent   bool    `json:"hasContent"`
 	HasResult    bool    `json:"hasResult"`
 	OutputFormat string  `json:"outputFormat,omitempty"`
+	Content      string  `json:"content,omitempty"`
 	Language     string  `json:"language,omitempty"`
 	Error        *string `json:"error,omitempty"`
 }

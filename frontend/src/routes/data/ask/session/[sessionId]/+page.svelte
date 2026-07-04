@@ -118,7 +118,6 @@
 						<div class="flex flex-wrap items-center gap-2">
 							<Card.Title class="text-lg">Запрос</Card.Title>
 						</div>
-						<Card.Description>Оригинальный запрос пользователя к базе знаний.</Card.Description>
 					</Card.Header>
 					<Card.Content class="pt-5">
 						<p class="whitespace-pre-wrap break-words">{session.query}</p>
@@ -128,7 +127,6 @@
 				<Card.Root class="bg-card/90 rounded-[1.75rem] border-border/60 shadow-[0_20px_60px_-36px_rgba(0,0,0,0.35)]">
 					<Card.Header class="gap-2 border-b border-border/60 pb-5">
 						<Card.Title class="text-lg">Ответ</Card.Title>
-						<Card.Description>Ответ от системы поиска по базе знаний.</Card.Description>
 					</Card.Header>
 					<Card.Content class="space-y-4 pt-5">
 						<div class="bg-background/80 max-h-[32rem] overflow-auto rounded-2xl border border-border/60 p-4 text-sm leading-6 whitespace-pre-wrap break-words">

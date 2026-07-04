@@ -42,6 +42,7 @@ type BackendKnowledgeObject = {
   sha256?: string;
   hasContent?: boolean;
   hasResult?: boolean;
+  outputFormat?: string;
   language?: string | null;
 };
 
@@ -398,6 +399,7 @@ function mapKnowledgeObject(item: BackendKnowledgeObject): KnowledgeObject {
     sha256: item.sha256,
     hasContent: item.hasContent,
     hasResult: item.hasResult,
+    outputFormat: item.outputFormat,
     language: item.language,
   };
 }

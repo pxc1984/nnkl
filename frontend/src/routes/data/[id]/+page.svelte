@@ -9,6 +9,7 @@
 		reprocessKnowledgeObject,
 	} from "$lib/api/data";
 	import DataStatusBadge from "$lib/components/data/data-status-badge.svelte";
+	import MarkdownRenderer from "$lib/components/markdown-renderer.svelte";
 	import * as Alert from "$lib/components/ui/alert/index.js";
 	import { Badge } from "$lib/components/ui/badge/index.js";
 	import { Button } from "$lib/components/ui/button/index.js";
@@ -16,7 +17,6 @@
 	import {
 		formatBytes,
 		formatDateTime,
-		getContentPreview,
 		getMetadataEntries,
 		getObjectTitle,
 		getObjectTypeLabel,
@@ -37,7 +37,7 @@
 
 	const objectId = $derived(page.params.id);
 	const metadataEntries = $derived(getMetadataEntries(object?.metadata));
-	const contentPreview = $derived(getContentPreview(object?.content));
+	const hasMarkdownContent = $derived(Boolean(object?.content?.trim()));
 
 	async function loadObject(): Promise<void> {
 		if (!objectId) {
@@ -252,16 +252,18 @@
 
 				<section class="rounded-3xl border bg-card/70 p-6 shadow-sm">
 					<div class="mb-4 flex items-center justify-between gap-3">
-						<h2 class="text-lg font-semibold">Содержимое</h2>
-						{#if contentPreview.truncated}
-							<span class="text-muted-foreground text-sm">Показан фрагмент</span>
+						<h2 class="text-lg font-semibold">Markdown</h2>
+						{#if object.outputFormat}
+							<span class="text-muted-foreground text-sm uppercase tracking-wide">{object.outputFormat}</span>
 						{/if}
 					</div>
 
-					{#if contentPreview.text}
-						<pre class="bg-muted/50 overflow-x-auto rounded-2xl border p-4 text-sm leading-6 whitespace-pre-wrap">{contentPreview.text}</pre>
+					{#if hasMarkdownContent}
+						<div class="bg-muted/20 rounded-2xl border p-4 md:p-6">
+							<MarkdownRenderer markdown={object.content ?? ""} />
+						</div>
 					{:else}
-						<p class="text-muted-foreground text-sm">Текстовое содержимое пока недоступно.</p>
+						<p class="text-muted-foreground text-sm">Отпаршенный markdown пока недоступен.</p>
 					{/if}
 				</section>
 

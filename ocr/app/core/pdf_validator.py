@@ -27,7 +27,9 @@ def validate_pdf(file_path: Path) -> None:
             if len(pdf.pages) == 0:
                 raise PDFValidationError("PDF не содержит страниц")
     except pikepdf.PdfError as exc:
-        logger.warning("pdf.pikepdf_validation_failed", path=str(file_path), error=str(exc))
+        logger.warning(
+            "pdf.pikepdf_validation_failed", path=str(file_path), error=str(exc)
+        )
         raise PDFValidationError(f"Некорректный PDF (pikepdf): {exc}") from exc
 
     try:
@@ -35,7 +37,9 @@ def validate_pdf(file_path: Path) -> None:
             if doc.page_count == 0:
                 raise PDFValidationError("PDF не содержит страниц (PyMuPDF)")
     except Exception as exc:  # noqa: BLE001 — fitz может бросать разные типы
-        logger.warning("pdf.pymupdf_validation_failed", path=str(file_path), error=str(exc))
+        logger.warning(
+            "pdf.pymupdf_validation_failed", path=str(file_path), error=str(exc)
+        )
         raise PDFValidationError(f"Некорректный PDF (PyMuPDF): {exc}") from exc
 
     logger.info("pdf.validated", path=str(file_path))

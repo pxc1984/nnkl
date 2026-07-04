@@ -11,7 +11,9 @@ from fastapi.testclient import TestClient
 from app.db.models import InputBlob, ParseJob
 
 
-def _insert_blob(db_session, sample_pdf: Path, blob_id: str = "00000000-0000-0000-0000-000000000001") -> InputBlob:
+def _insert_blob(
+    db_session, sample_pdf: Path, blob_id: str = "00000000-0000-0000-0000-000000000001"
+) -> InputBlob:
     blob = InputBlob(
         id=uuid.UUID(blob_id),
         filename=sample_pdf.name,
@@ -53,7 +55,9 @@ class TestHealthEndpoint:
 
 class TestParseEndpoint:
     @patch("app.use_cases.parse_document.get_ocr_service")
-    def test_parse_native_pdf_bypasses_docling(self, mock_get_ocr_service, client: TestClient, db_session, sample_pdf: Path) -> None:
+    def test_parse_native_pdf_bypasses_docling(
+        self, mock_get_ocr_service, client: TestClient, db_session, sample_pdf: Path
+    ) -> None:
         blob_id = str(uuid.uuid4())
         _insert_blob(db_session, sample_pdf, blob_id=blob_id)
 
@@ -91,7 +95,10 @@ class TestParseEndpoint:
         ocr_service = mock_get_ocr_service.return_value
         ocr_service.convert.return_value = ("docling fallback", None)
 
-        with patch("app.use_cases.parse_document.should_use_native_pdf_text", return_value=False):
+        with patch(
+            "app.use_cases.parse_document.should_use_native_pdf_text",
+            return_value=False,
+        ):
             response = client.post(
                 "/api/v1/parse",
                 json={
@@ -107,7 +114,9 @@ class TestParseEndpoint:
         ocr_service.convert.assert_called_once()
 
     @patch("app.use_cases.parse_document.get_ocr_service")
-    def test_parse_persists_result(self, mock_get_ocr_service, client: TestClient, db_session, sample_pdf: Path) -> None:
+    def test_parse_persists_result(
+        self, mock_get_ocr_service, client: TestClient, db_session, sample_pdf: Path
+    ) -> None:
         blob_id = str(uuid.uuid4())
         _insert_blob(db_session, sample_pdf, blob_id=blob_id)
         ocr_service = mock_get_ocr_service.return_value
@@ -151,7 +160,9 @@ class TestParseEndpoint:
 
 class TestStatusAndResultEndpoints:
     @patch("app.use_cases.parse_document.get_ocr_service")
-    def test_status_and_result_return_db_content(self, mock_get_ocr_service, client: TestClient, db_session, sample_pdf: Path) -> None:
+    def test_status_and_result_return_db_content(
+        self, mock_get_ocr_service, client: TestClient, db_session, sample_pdf: Path
+    ) -> None:
         document_id = f"doc-{uuid.uuid4()}"
         blob_id = str(uuid.uuid4())
         _insert_blob(db_session, sample_pdf, blob_id=blob_id)
@@ -182,7 +193,9 @@ class TestStatusAndResultEndpoints:
 
 
 class TestNativeOfficeExtraction:
-    def test_parse_docx_uses_native_extraction(self, client: TestClient, db_session, sample_docx_bytes: bytes) -> None:
+    def test_parse_docx_uses_native_extraction(
+        self, client: TestClient, db_session, sample_docx_bytes: bytes
+    ) -> None:
         blob_id = str(uuid.uuid4())
         _insert_blob_bytes(
             db_session,
@@ -210,7 +223,9 @@ class TestNativeOfficeExtraction:
         assert "DOCX body text" in content
         assert "Cell A | Cell B" in content
 
-    def test_parse_pptx_uses_native_extraction(self, client: TestClient, db_session, sample_pptx_bytes: bytes) -> None:
+    def test_parse_pptx_uses_native_extraction(
+        self, client: TestClient, db_session, sample_pptx_bytes: bytes
+    ) -> None:
         blob_id = str(uuid.uuid4())
         _insert_blob_bytes(
             db_session,

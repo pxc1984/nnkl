@@ -11,7 +11,11 @@ from app.db.models import Base
 
 
 def create_session_factory(settings: Settings) -> sessionmaker[Session]:
-    connect_args = {"check_same_thread": False} if settings.database_url.startswith("sqlite") else {}
+    connect_args = (
+        {"check_same_thread": False}
+        if settings.database_url.startswith("sqlite")
+        else {}
+    )
     engine = create_engine(
         settings.database_url,
         future=True,

@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     postgres_password: str = "admin"
     postgres_db: str = "db"
     postgres_ssl_mode: str = "disable"
+
     @property
     def database_url(self) -> str:
         return (

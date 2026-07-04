@@ -6,7 +6,15 @@ import structlog
 from fastapi import APIRouter, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
-from app.api.schemas import ErrorResponse, HealthResponse, ParseRequest, ParseResponse, ParseResultResponse, StatusResponse, TaskStatus
+from app.api.schemas import (
+    ErrorResponse,
+    HealthResponse,
+    ParseRequest,
+    ParseResponse,
+    ParseResultResponse,
+    StatusResponse,
+    TaskStatus,
+)
 from app.config import get_settings
 from app.db.models import ParseJob
 from app.db.session import check_database
@@ -50,7 +58,10 @@ async def parse_pdf(request_body: ParseRequest, request: Request) -> ParseRespon
             correlation_id=correlation_id,
         )
         if job.result is None:
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Parse result was not persisted")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Parse result was not persisted",
+            )
         return ParseResponse(
             document_id=job.document_id,
             job_id=job.id,
@@ -72,9 +83,15 @@ async def get_status(document_id: str, request: Request) -> StatusResponse:
     session = _get_session(request)
 
     try:
-        job = session.query(ParseJob).filter(ParseJob.document_id == document_id).one_or_none()
+        job = (
+            session.query(ParseJob)
+            .filter(ParseJob.document_id == document_id)
+            .one_or_none()
+        )
         if job is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Parse job not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Parse job not found"
+            )
 
         return StatusResponse(
             document_id=job.document_id,
@@ -96,9 +113,15 @@ async def get_result(document_id: str, request: Request) -> ParseResultResponse:
     session = _get_session(request)
 
     try:
-        job = session.query(ParseJob).filter(ParseJob.document_id == document_id).one_or_none()
+        job = (
+            session.query(ParseJob)
+            .filter(ParseJob.document_id == document_id)
+            .one_or_none()
+        )
         if job is None or job.result is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Parse result not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Parse result not found"
+            )
 
         return ParseResultResponse(
             document_id=job.document_id,

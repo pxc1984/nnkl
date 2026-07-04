@@ -6,7 +6,10 @@ from pathlib import Path
 from typing import Any
 
 import structlog
-from docling_core.transforms.serializer.base import BaseTableSerializer, SerializationResult
+from docling_core.transforms.serializer.base import (
+    BaseTableSerializer,
+    SerializationResult,
+)
 from docling_core.transforms.serializer.common import create_ser_result
 from docling_core.transforms.serializer.latex import (
     LaTeXDocSerializer,
@@ -73,7 +76,9 @@ class TabularxTableSerializer(BaseTableSerializer):
             if table_text:
                 content.append(table_text)
             content.append("\\end{table}")
-            res_parts.append(create_ser_result(text="\n".join(content), span_source=item))
+            res_parts.append(
+                create_ser_result(text="\n".join(content), span_source=item)
+            )
 
         return create_ser_result(
             text="\n\n".join([r.text for r in res_parts if r.text]),
@@ -81,7 +86,9 @@ class TabularxTableSerializer(BaseTableSerializer):
         )
 
 
-def _cell_text(cell: Any, doc_serializer: Any, doc: DoclingDocument, params: LaTeXParams) -> str:
+def _cell_text(
+    cell: Any, doc_serializer: Any, doc: DoclingDocument, params: LaTeXParams
+) -> str:
     if isinstance(cell, RichTableCell):
         text = doc_serializer.serialize(item=cell.ref.resolve(doc=doc), **{}).text
     else:
@@ -101,8 +108,12 @@ def _build_tabularx_table(
 
     grid = item.data.grid
     num_cols = item.data.num_cols or max(len(row) for row in grid)
-    widths = estimate_column_widths(item)
-    colspec = "|" + "|".join(f">{{\\raggedright\\arraybackslash}}X" for _ in range(num_cols)) + "|"
+    estimate_column_widths(item)
+    colspec = (
+        "|"
+        + "|".join(">{\\raggedright\\arraybackslash}X" for _ in range(num_cols))
+        + "|"
+    )
 
     lines = [
         f"\\begin{{tabularx}}{{\\textwidth}}{{{colspec}}}",
@@ -110,7 +121,6 @@ def _build_tabularx_table(
     ]
 
     # Отслеживаем занятые ячейки из-за rowspan
-    occupied: set[tuple[int, int]] = set()
     skip_cells: set[tuple[int, int]] = set()
 
     for row_idx, row in enumerate(grid):
@@ -175,7 +185,9 @@ def export_to_latex(
     Использует кастомный TabularxTableSerializer для сложных таблиц
     материаловедческих справочников.
     """
-    image_mode = ImageRefMode.REFERENCED if image_output_dir else ImageRefMode.PLACEHOLDER
+    image_mode = (
+        ImageRefMode.REFERENCED if image_output_dir else ImageRefMode.PLACEHOLDER
+    )
 
     params = LaTeXParams(
         image_mode=image_mode,

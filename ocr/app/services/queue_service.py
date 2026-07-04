@@ -111,7 +111,13 @@ def _get_inspect_tasks(celery_app: Celery, *, kind: str) -> list[QueueTaskItem]:
         items: list[QueueTaskItem] = []
         seen: set[str] = set()
         for worker, task in raw_tasks:
-            item = _task_dict_to_item(task, worker=worker, status=TaskStatus.PROCESSING if kind == "processing" else TaskStatus.PENDING)
+            item = _task_dict_to_item(
+                task,
+                worker=worker,
+                status=TaskStatus.PROCESSING
+                if kind == "processing"
+                else TaskStatus.PENDING,
+            )
             if item is None or item.task_id in seen:
                 continue
             seen.add(item.task_id)

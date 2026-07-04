@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import contextlib
 import tempfile
-from collections.abc import Callable
 from pathlib import Path
 from typing import Literal
 
@@ -100,14 +99,22 @@ class OCRService:
                 InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options),
             },
         )
-        logger.info("ocr_service.pipeline_initializing", do_formula_enrichment=False, do_code_enrichment=False)
+        logger.info(
+            "ocr_service.pipeline_initializing",
+            do_formula_enrichment=False,
+            do_code_enrichment=False,
+        )
         converter.initialize_pipeline(InputFormat.PDF)
         logger.info("ocr_service.converter_ready", engine="docling")
         return converter
 
-    def preprocess_pdf(self, source_path: Path, *, correlation_id: str | None = None) -> Path:
+    def preprocess_pdf(
+        self, source_path: Path, *, correlation_id: str | None = None
+    ) -> Path:
         """Предобработка сканов через PyMuPDF."""
-        return self.preprocess_pdf_for_ocr(source_path, needs_enhancement=True, correlation_id=correlation_id)
+        return self.preprocess_pdf_for_ocr(
+            source_path, needs_enhancement=True, correlation_id=correlation_id
+        )
 
     def preprocess_pdf_for_ocr(
         self,

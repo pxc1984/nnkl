@@ -26,7 +26,9 @@ def extract_native_document_text(file_path: Path, *, output_format: str) -> str:
     elif suffix == ".pptx":
         text = _extract_pptx_text(file_path)
     else:
-        raise UnsupportedDocumentTypeError(f"Unsupported document type: {suffix or 'unknown'}")
+        raise UnsupportedDocumentTypeError(
+            f"Unsupported document type: {suffix or 'unknown'}"
+        )
 
     if output_format == "latex":
         return _to_latex(text)
@@ -39,7 +41,10 @@ def has_native_pdf_text(file_path: Path, *, min_chars: int = 50) -> bool:
         with fitz.open(file_path) as document:
             if document.page_count == 0:
                 return False
-            return len(sanitize_extracted_text(document[0].get_text()).strip()) >= min_chars
+            return (
+                len(sanitize_extracted_text(document[0].get_text()).strip())
+                >= min_chars
+            )
     except Exception:  # noqa: BLE001
         return False
 
@@ -52,7 +57,9 @@ def should_use_native_pdf_text(file_path: Path, *, min_chars: int = 50) -> bool:
                 return False
             raw_text = document[0].get_text()
             sanitized = sanitize_extracted_text(raw_text).strip()
-            return len(sanitized) >= min_chars and _is_reasonable_pdf_text(raw_text, sanitized)
+            return len(sanitized) >= min_chars and _is_reasonable_pdf_text(
+                raw_text, sanitized
+            )
     except Exception:  # noqa: BLE001
         return False
 
@@ -71,7 +78,9 @@ def sanitize_extracted_text(text: str) -> str:
     """Removes NUL and other disallowed control characters from extracted text."""
     if not text:
         return ""
-    return "".join(char for char in text if char >= " " or char in _ALLOWED_CONTROL_CHARS)
+    return "".join(
+        char for char in text if char >= " " or char in _ALLOWED_CONTROL_CHARS
+    )
 
 
 def _is_reasonable_pdf_text(raw_text: str, sanitized_text: str) -> bool:
@@ -92,7 +101,11 @@ def _is_reasonable_pdf_text(raw_text: str, sanitized_text: str) -> bool:
 
 def _extract_docx_text(file_path: Path) -> str:
     document = DocxDocument(file_path)
-    lines = [paragraph.text.strip() for paragraph in document.paragraphs if paragraph.text.strip()]
+    lines = [
+        paragraph.text.strip()
+        for paragraph in document.paragraphs
+        if paragraph.text.strip()
+    ]
 
     for table in document.tables:
         for row in table.rows:

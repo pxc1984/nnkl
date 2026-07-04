@@ -15,7 +15,10 @@ from app.api.schemas import ParseRequest, TaskStatus
 from app.config import Settings
 from app.db.models import InputBlob, ParseJob, ParseResult
 from app.services.ocr_service import get_ocr_service
-from app.use_cases.document_extractor import extract_native_document_text, should_use_native_pdf_text
+from app.use_cases.document_extractor import (
+    extract_native_document_text,
+    should_use_native_pdf_text,
+)
 
 
 class InputBlobNotFoundError(Exception):
@@ -33,7 +36,11 @@ def parse_document(
     if blob is None:
         raise InputBlobNotFoundError(request.input_blob_id)
 
-    job = session.query(ParseJob).filter(ParseJob.document_id == request.document_id).one_or_none()
+    job = (
+        session.query(ParseJob)
+        .filter(ParseJob.document_id == request.document_id)
+        .one_or_none()
+    )
     if job is None:
         job = ParseJob(
             id=uuid.uuid4(),
@@ -53,7 +60,9 @@ def parse_document(
         job.error = None
     session.commit()
 
-    work_dir = Path(tempfile.mkdtemp(prefix=f"ocr_{job.id}_", dir=str(settings.ocr_temp_dir)))
+    work_dir = Path(
+        tempfile.mkdtemp(prefix=f"ocr_{job.id}_", dir=str(settings.ocr_temp_dir))
+    )
     try:
         input_path = work_dir / _resolve_filename(blob.filename)
         input_path.write_bytes(blob.content)
@@ -116,7 +125,9 @@ def _parse_input_document(
 ) -> tuple[str, Path | None]:
     if input_path.suffix.lower() == ".pdf":
         if should_use_native_pdf_text(input_path):
-            return extract_native_document_text(input_path, output_format=output_format), None
+            return extract_native_document_text(
+                input_path, output_format=output_format
+            ), None
 
         ocr_service = get_ocr_service(
             artifacts_path=settings.ocr_docling_artifacts_path,

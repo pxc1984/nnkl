@@ -9,7 +9,10 @@ from app.services.table_postprocessor import (
     normalize_unit_text,
     postprocess_table_cell,
 )
-from app.use_cases.document_extractor import has_native_pdf_text, sanitize_extracted_text
+from app.use_cases.document_extractor import (
+    has_native_pdf_text,
+    sanitize_extracted_text,
+)
 
 
 class TestTablePostprocessor:

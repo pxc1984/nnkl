@@ -12,6 +12,7 @@ type settings struct {
 	LogLevel         string        `envconfig:"LOG_LEVEL" default:"INFO"`
 	StoreBackend     string        `envconfig:"STORE_BACKEND" default:"memory"`
 	OCRServiceURL    string        `envconfig:"OCR_SERVICE_URL" default:"http://ocr:8000/api/v1"`
+	LightRAGURL      string        `envconfig:"LIGHTRAG_URL" default:"http://lightrag:9621"`
 	MaxUploadSizeMB  int64         `envconfig:"MAX_UPLOAD_SIZE_MB" default:"50"`
 	PostgresHost     string        `envconfig:"POSTGRES_HOST" default:"db"`
 	PostgresPort     int           `envconfig:"POSTGRES_PORT" default:"5432"`

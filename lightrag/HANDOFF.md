@@ -20,7 +20,7 @@ docker compose up -d --build
 
 Приложение: <http://127.0.0.1:9689>
 
-LightRAG: <http://127.0.0.1:9621>
+LightRAG: <http://127.0.0.1:19621>
 
 ## Индексация
 

@@ -2,7 +2,7 @@ services:
   lightrag:
     build: .
     ports:
-      - "9621:9621"
+      - "19621:9621"
     env_file:
       - .env
     environment:

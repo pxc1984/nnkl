@@ -116,7 +116,7 @@ services:
       POSTGRES_IVFFLAT_LISTS: ${LIGHTRAG_POSTGRES_IVFFLAT_LISTS}
       WORKSPACE: ${LIGHTRAG_WORKSPACE}
     ports:
-      - "9621:9621"
+      - "19621:9621"
     volumes:
       - ./lightrag/inputs:/app/data/inputs
       - ./lightrag/prompts:/app/data/prompts

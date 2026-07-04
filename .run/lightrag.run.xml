@@ -129,7 +129,7 @@
           <list>
             <DockerPortBindingImpl>
               <option name="containerPort" value="9621" />
-              <option name="hostPort" value="9621" />
+              <option name="hostPort" value="19621" />
             </DockerPortBindingImpl>
           </list>
         </option>

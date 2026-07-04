@@ -17,7 +17,7 @@ docker compose up --build
 
 Основное приложение: <http://localhost:9689>
 
-LightRAG API и Web UI: <http://localhost:9621>
+LightRAG API и Web UI: <http://localhost:19621>
 
 LLM и embeddings выполняются внешними API. Стек не требует GPU и подходит для CPU-сервера.
 

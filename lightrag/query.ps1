@@ -13,7 +13,7 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$Query,
 
-    [string]$LightRagApi = "http://127.0.0.1:9621",
+    [string]$LightRagApi = "http://127.0.0.1:19621",
     [ValidateSet("naive", "local", "global", "hybrid")]
     [string]$Mode = "hybrid"
 )

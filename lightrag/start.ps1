@@ -22,7 +22,7 @@ Get-Content "$root\.env" |
 
 & "$root\.venv\Scripts\lightrag-server.exe" `
     --host 127.0.0.1 `
-    --port 9621 `
+    --port 19621 `
     --working-dir "$root\rag_storage" `
     --input-dir "$root\inputs" `
     --workers 1

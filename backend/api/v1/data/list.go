@@ -26,15 +26,22 @@ func (a *DataAPI) list(c *gin.Context) {
 		api.RespondError(c, http.StatusInternalServerError, "failed to list objects", "internal_error")
 		return
 	}
-	if len(blobs) == 0 {
-		c.Status(http.StatusNoContent)
-		return
+
+	var totalPages int64
+	if pageSize > 0 {
+		totalPages = (total + int64(pageSize) - 1) / int64(pageSize)
+	}
+	if totalPages == 0 {
+		totalPages = 1
 	}
 
 	c.JSON(http.StatusOK, shared.PaginatedKnowledgeObjectList{
-		Items:    shared.ToKnowledgeObjectResponses(blobs),
-		Page:     page,
-		PageSize: pageSize,
-		Total:    total,
+		Items: shared.ToKnowledgeObjectResponses(blobs),
+		Meta: shared.PaginationMeta{
+			Page:       page,
+			PageSize:   pageSize,
+			Total:      total,
+			TotalPages: totalPages,
+		},
 	})
 }

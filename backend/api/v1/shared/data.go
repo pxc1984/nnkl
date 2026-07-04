@@ -32,11 +32,16 @@ type KnowledgeObjectDetails struct {
 	Error        *string `json:"error,omitempty"`
 }
 
+type PaginationMeta struct {
+	Page       int   `json:"page"`
+	PageSize   int   `json:"pageSize"`
+	Total      int64 `json:"total"`
+	TotalPages int64 `json:"totalPages"`
+}
+
 type PaginatedKnowledgeObjectList struct {
-	Items    []KnowledgeObjectResponse `json:"items"`
-	Page     int                       `json:"page"`
-	PageSize int                       `json:"pageSize"`
-	Total    int64                     `json:"total"`
+	Items []KnowledgeObjectResponse `json:"items"`
+	Meta  PaginationMeta            `json:"meta"`
 }
 
 func ToKnowledgeObjectResponse(blob *store.InputBlob) KnowledgeObjectResponse {

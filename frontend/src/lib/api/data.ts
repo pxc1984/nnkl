@@ -14,10 +14,29 @@ import type {
 
 const MAX_UPLOAD_BATCH_BYTES = 9 * 1024 * 1024;
 
+type ListKnowledgeObjectsBackendResponse = {
+  items: Array<{
+    id: string;
+    filename: string;
+    type: string;
+    contentType: string;
+    tags: string[];
+    sizeBytes: number;
+    createdAt: string;
+    updatedAt: string;
+  }>;
+  meta: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
+};
+
 export async function listKnowledgeObjects(
   params: DataListParams,
 ): Promise<PaginatedKnowledgeObjectList> {
-  const response = await api.get<PaginatedKnowledgeObjectList>("/api/v1/data", {
+  const response = await api.get<ListKnowledgeObjectsBackendResponse>("/api/v1/data", {
     params: {
       page: params.page,
       pageSize: params.pageSize,
@@ -25,22 +44,29 @@ export async function listKnowledgeObjects(
       type: params.type,
       tags: params.tags,
     },
-    validateStatus: (status) => status === 200 || status === 204,
   });
 
-  if (response.status === 204) {
-    return {
-      items: [],
-      meta: {
-        page: params.page ?? 1,
-        pageSize: params.pageSize ?? DEFAULT_DATA_PAGE_SIZE,
-        total: 0,
-        totalPages: 0,
-      },
-    };
-  }
+  const meta = response.data.meta ?? {
+    page: params.page ?? 1,
+    pageSize: params.pageSize ?? DEFAULT_DATA_PAGE_SIZE,
+    total: 0,
+    totalPages: 0,
+  };
 
-  return response.data;
+  return {
+    items: response.data.items.map((item) => ({
+      id: item.id,
+      filename: item.filename,
+      originalFilename: item.filename,
+      mimeType: item.contentType,
+      size: item.sizeBytes,
+      status: "ready" as const,
+      createdAt: item.createdAt,
+      updatedAt: item.updatedAt,
+      tags: item.tags,
+    })),
+    meta,
+  };
 }
 
 export async function listDataTags(): Promise<DataTagList> {

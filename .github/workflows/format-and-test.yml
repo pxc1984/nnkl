@@ -1,148 +1,148 @@
-name: Format & Test
-
-on:
+#name: Format & Test
+#
+#on:
 #  push:
 #  pull_request:
-
-env:
-  GO_VERSION: '1.26'
-  GOFUMPT_VERSION: v0.7.0
-  NODE_VERSION: '24'
-  PNPM_VERSION: 11.5.3
-
-jobs:
-  format:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-          cache-dependency-path: backend/go.sum
-
-      - name: Cache gofumpt
-        id: cache-gofumpt
-        uses: actions/cache@v4
-        with:
-          path: ~/go/bin/gofumpt
-          key: ${{ runner.os }}-go-${{ env.GO_VERSION }}-gofumpt-${{ env.GOFUMPT_VERSION }}
-
-      - name: Check go mod tidy
-        working-directory: backend
-        run: |
-          go mod tidy
-          git diff --exit-code -- go.mod go.sum
-
-      - name: Install gofumpt
-        if: steps.cache-gofumpt.outputs.cache-hit != 'true'
-        run: go install mvdan.cc/gofumpt@${{ env.GOFUMPT_VERSION }}
-
-      - name: Check Go formatting
-        working-directory: backend
-        run: |
-          gofumpt -l -w .
-          git diff --exit-code -- .
-
-      - name: Run go vet
-        working-directory: backend
-        run: go vet ./...
-
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: pnpm
-          cache-dependency-path: frontend/pnpm-lock.yaml
-
-      - name: Install frontend dependencies
-        working-directory: frontend
-        run: pnpm install --frozen-lockfile --prefer-offline
-
-      - name: Run frontend checks
-        working-directory: frontend
-        run: pnpm run check
-
-      - name: Run frontend lint
-        working-directory: frontend
-        run: pnpm run lint
-
-  test-backend:
-    needs: format
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: backend
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-          cache-dependency-path: backend/go.sum
-
-      - name: Run tests
-        run: go test -p 1 -count=1 ./...
-
-  test-frontend:
-    needs: format
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: frontend
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: pnpm
-          cache-dependency-path: frontend/pnpm-lock.yaml
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile --prefer-offline
-
-      - name: Build frontend
-        run: pnpm run build
-
-  test-docker-stack:
-    needs:
-      - test-backend
-      - test-frontend
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Validate docker compose
-        run: |
-          cp .env.example .env 
-          docker compose config
-
-      - name: Build stack images
-        run: |
-          cp .env.example .env
-          docker buildx bake --file docker-compose.yml \
-            --set *.cache-from=type=gha \
-            --set *.cache-to=type=gha,mode=max
+#
+#env:
+#  GO_VERSION: '1.26'
+#  GOFUMPT_VERSION: v0.7.0
+#  NODE_VERSION: '24'
+#  PNPM_VERSION: 11.5.3
+#
+#jobs:
+#  format:
+#    runs-on: ubuntu-latest
+#
+#    steps:
+#      - uses: actions/checkout@v4
+#
+#      - name: Set up Go
+#        uses: actions/setup-go@v5
+#        with:
+#          go-version: ${{ env.GO_VERSION }}
+#          cache: true
+#          cache-dependency-path: backend/go.sum
+#
+#      - name: Cache gofumpt
+#        id: cache-gofumpt
+#        uses: actions/cache@v4
+#        with:
+#          path: ~/go/bin/gofumpt
+#          key: ${{ runner.os }}-go-${{ env.GO_VERSION }}-gofumpt-${{ env.GOFUMPT_VERSION }}
+#
+#      - name: Check go mod tidy
+#        working-directory: backend
+#        run: |
+#          go mod tidy
+#          git diff --exit-code -- go.mod go.sum
+#
+#      - name: Install gofumpt
+#        if: steps.cache-gofumpt.outputs.cache-hit != 'true'
+#        run: go install mvdan.cc/gofumpt@${{ env.GOFUMPT_VERSION }}
+#
+#      - name: Check Go formatting
+#        working-directory: backend
+#        run: |
+#          gofumpt -l -w .
+#          git diff --exit-code -- .
+#
+#      - name: Run go vet
+#        working-directory: backend
+#        run: go vet ./...
+#
+#      - name: Set up pnpm
+#        uses: pnpm/action-setup@v4
+#        with:
+#          version: ${{ env.PNPM_VERSION }}
+#
+#      - name: Set up Node.js
+#        uses: actions/setup-node@v4
+#        with:
+#          node-version: ${{ env.NODE_VERSION }}
+#          cache: pnpm
+#          cache-dependency-path: frontend/pnpm-lock.yaml
+#
+#      - name: Install frontend dependencies
+#        working-directory: frontend
+#        run: pnpm install --frozen-lockfile --prefer-offline
+#
+#      - name: Run frontend checks
+#        working-directory: frontend
+#        run: pnpm run check
+#
+#      - name: Run frontend lint
+#        working-directory: frontend
+#        run: pnpm run lint
+#
+#  test-backend:
+#    needs: format
+#    runs-on: ubuntu-latest
+#    defaults:
+#      run:
+#        working-directory: backend
+#
+#    steps:
+#      - uses: actions/checkout@v4
+#
+#      - name: Set up Go
+#        uses: actions/setup-go@v5
+#        with:
+#          go-version: ${{ env.GO_VERSION }}
+#          cache: true
+#          cache-dependency-path: backend/go.sum
+#
+#      - name: Run tests
+#        run: go test -p 1 -count=1 ./...
+#
+#  test-frontend:
+#    needs: format
+#    runs-on: ubuntu-latest
+#    defaults:
+#      run:
+#        working-directory: frontend
+#
+#    steps:
+#      - uses: actions/checkout@v4
+#
+#      - name: Set up pnpm
+#        uses: pnpm/action-setup@v4
+#        with:
+#          version: ${{ env.PNPM_VERSION }}
+#
+#      - name: Set up Node.js
+#        uses: actions/setup-node@v4
+#        with:
+#          node-version: ${{ env.NODE_VERSION }}
+#          cache: pnpm
+#          cache-dependency-path: frontend/pnpm-lock.yaml
+#
+#      - name: Install dependencies
+#        run: pnpm install --frozen-lockfile --prefer-offline
+#
+#      - name: Build frontend
+#        run: pnpm run build
+#
+#  test-docker-stack:
+#    needs:
+#      - test-backend
+#      - test-frontend
+#    runs-on: ubuntu-latest
+#
+#    steps:
+#      - uses: actions/checkout@v4
+#
+#      - name: Set up Docker Buildx
+#        uses: docker/setup-buildx-action@v3
+#
+#      - name: Validate docker compose
+#        run: |
+#          cp .env.example .env
+#          docker compose config
+#
+#      - name: Build stack images
+#        run: |
+#          cp .env.example .env
+#          docker buildx bake --file docker-compose.yml \
+#            --set *.cache-from=type=gha \
+#            --set *.cache-to=type=gha,mode=max

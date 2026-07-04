@@ -118,11 +118,6 @@
 			cell: ({ row }) => renderSnippet(titleSnippet, { title: getObjectTitle(row.original) }),
 		},
 		{
-			accessorKey: "mimeType",
-			header: "Тип",
-			cell: ({ row }) => renderSnippet(typeSnippet, { type: getObjectTypeLabel(row.original) }),
-		},
-		{
 			accessorKey: "size",
 			header: "Размер",
 			cell: ({ row }) => renderSnippet(sizeSnippet, { size: formatBytes(row.original.size) }),

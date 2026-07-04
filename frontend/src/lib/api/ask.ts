@@ -13,6 +13,14 @@ export type AskResponse = {
   sessionId: string;
 };
 
+export type QuerySessionResponse = {
+  id: string;
+  query: string;
+  answer: string;
+  mode: string;
+  createdAt: string;
+};
+
 const NO_CONTEXT_MARKER = "[no-context]";
 
 export function isNoContextAnswer(answer: string): boolean {
@@ -27,6 +35,18 @@ export async function askQuestion(
     query,
     mode,
   });
+  return response.data;
+}
+
+export async function listQuerySessions(
+  pageSize = 8,
+): Promise<QuerySessionResponse[]> {
+  const response = await api.get<QuerySessionResponse[]>(
+    "/api/v1/data/ask/sessions",
+    {
+      params: { pageSize },
+    },
+  );
   return response.data;
 }
 

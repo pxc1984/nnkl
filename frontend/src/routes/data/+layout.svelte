@@ -1,6 +1,9 @@
 <script lang="ts">
 	import type { Snippet } from "svelte";
 	import { page } from "$app/state";
+	import { onMount } from "svelte";
+	import { listQuerySessions } from "$lib/api/ask";
+	import { setQuerySessions } from "$lib/ask/query-sessions";
 	import { authState } from "$lib/auth/store";
 	import AppSidebar from "$lib/components/app-sidebar.svelte";
 	import * as Breadcrumb from "$lib/components/ui/breadcrumb/index.js";
@@ -42,6 +45,19 @@
 	const isGraphRoute = $derived(page.url.pathname.startsWith("/data/graph"));
 
 	let { children }: { children: Snippet } = $props();
+
+	onMount(() => {
+		void loadQuerySessions();
+	});
+
+	async function loadQuerySessions(): Promise<void> {
+		try {
+			const sessions = await listQuerySessions();
+			setQuerySessions(sessions);
+		} catch {
+			setQuerySessions([]);
+		}
+	}
 </script>
 
 <Sidebar.Provider>

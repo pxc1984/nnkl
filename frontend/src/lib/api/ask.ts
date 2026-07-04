@@ -51,6 +51,15 @@ export async function listQuerySessions(
   return response.data;
 }
 
+export async function getQuerySession(
+  sessionId: string,
+): Promise<QuerySessionResponse> {
+  const response = await api.get<QuerySessionResponse>(
+    `/api/v1/data/ask/session/${sessionId}`
+  );
+  return response.data;
+}
+
 type StreamMessage = {
   response?: string;
   error?: string;
@@ -73,29 +82,65 @@ export async function streamQuestion(
     body: JSON.stringify({ query, mode }),
   });
 
-  if (!response.ok || !response.body) {
-    throw new Error(`Knowledge base returned ${response.status}`);
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}: ${(await response.text()).trim()}`);
   }
 
-  const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
-  let pending = "";
-  while (true) {
-    const { value, done } = await reader.read();
-    pending += value ?? "";
-    const lines = pending.split("\n");
-    pending = lines.pop() ?? "";
-    for (const line of lines) {
-      if (!line.trim()) continue;
-      const message = JSON.parse(line) as StreamMessage;
-      if (message.error) throw new Error(message.error);
-      if (message.response) onChunk(message.response);
+  const reader = response.body?.getReader();
+  if (!reader) {
+    return;
+  }
+
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+
+      // Keep the last incomplete line in the buffer
+      buffer = lines.pop() ?? "";
+
+      for (const line of lines) {
+        if (line.trim() === "") {
+          continue;
+        }
+
+        try {
+          const chunk = JSON.parse(line) as StreamMessage;
+          if (chunk.error) {
+            throw new Error(chunk.error);
+          }
+          if (chunk.response) {
+            onChunk(chunk.response);
+          }
+        } catch (e) {
+          console.error("Failed to parse stream chunk:", e);
+        }
+      }
     }
-    if (done) break;
-  }
 
-  if (pending.trim()) {
-    const message = JSON.parse(pending) as StreamMessage;
-    if (message.error) throw new Error(message.error);
-    if (message.response) onChunk(message.response);
+    // Process any remaining buffer
+    if (buffer.trim() !== "") {
+      try {
+        const chunk = JSON.parse(buffer) as StreamMessage;
+        if (chunk.error) {
+          throw new Error(chunk.error);
+        }
+        if (chunk.response) {
+          onChunk(chunk.response);
+        }
+      } catch (e) {
+        console.error("Failed to parse final stream chunk:", e);
+      }
+    }
+  } finally {
+    reader.releaseLock();
   }
 }

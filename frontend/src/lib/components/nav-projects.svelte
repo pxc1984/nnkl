@@ -13,7 +13,7 @@
 
     async function handleSelectSession(sessionId: string) {
         activateQuerySession(sessionId);
-        await goto(resolve("/data/ask"));
+        await goto(resolve(`/data/ask/session/${sessionId}`));
     }
 </script>
 

@@ -48,3 +48,39 @@ func (a *DataAPI) listAskSessions(c *gin.Context) {
 
 	c.JSON(http.StatusOK, response)
 }
+
+func (a *DataAPI) getAskSession(c *gin.Context) {
+	user, ok := api.CurrentUserFromContext(c)
+	if !ok || user == nil {
+		api.RespondError(c, http.StatusUnauthorized, "unauthorized", "unauthorized")
+		return
+	}
+
+	sessionID := c.Param("sessionId")
+	if sessionID == "" {
+		api.RespondError(c, http.StatusBadRequest, "session ID is required", "bad_request")
+		return
+	}
+
+	session, err := a.store.GetQuerySessionByID(c.Request.Context(), sessionID)
+	if err != nil {
+		api.RespondError(c, http.StatusNotFound, "session not found", "not_found")
+		return
+	}
+
+	// Verify that the session belongs to the current user
+	if session.UserID != user.ID {
+		api.RespondError(c, http.StatusForbidden, "access denied", "forbidden")
+		return
+	}
+
+	response := QuerySessionResponse{
+		ID:        session.ID,
+		Query:     session.Query,
+		Answer:    session.Response,
+		Mode:      session.Mode,
+		CreatedAt: session.CreatedAt.UTC().Format("2006-01-02T15:04:05Z07:00"),
+	}
+
+	c.JSON(http.StatusOK, response)
+}

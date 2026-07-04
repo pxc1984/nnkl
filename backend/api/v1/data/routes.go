@@ -16,7 +16,7 @@ func RegisterDataRoutes(router gin.IRouter) {
 	a := &DataAPI{
 		store:    store.GetStore(),
 		ocr:      NewOCRClient(utils.Settings.OCRServiceURL, client),
-		lightrag: NewLightRAGClient(utils.Settings.LightRAGURL, client),
+		lightrag: NewLightRAGClient(utils.Settings.LightRAGServiceURL, utils.Settings.LightRAGAPIKey, client),
 		maxMB:    utils.Settings.MaxUploadSizeMB,
 	}
 

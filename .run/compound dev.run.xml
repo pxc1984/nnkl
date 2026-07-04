@@ -1,6 +1,7 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="compound dev" type="CompoundRunConfigurationType">
     <toRun name="db" type="docker-deploy" />
+    <toRun name="lightrag" type="docker-deploy" />
     <toRun name="backend" type="GoApplicationRunConfiguration" />
     <toRun name="frontend dev" type="js.build_tools.npm" />
     <toRun name="run ocr" type="ShConfigurationType" />

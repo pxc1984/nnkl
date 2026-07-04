@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/pxc1984/nnkl-backend/store"
+	"github.com/pxc1984/nnkl-backend/utils"
 )
 
 func HealthCheck(ctx *gin.Context) {
@@ -25,8 +26,9 @@ func HealthCheck(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusOK, gin.H{
-		"status":   "healthy",
-		"store":    st.Backend(),
-		"database": "up",
+		"status":         "healthy",
+		"store":          st.Backend(),
+		"database":       "up",
+		"maxUploadSizeMB": utils.Settings.MaxUploadSizeMB,
 	})
 }

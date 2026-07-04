@@ -1,6 +1,8 @@
 package data
 
 import (
+	"fmt"
+	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -15,6 +17,7 @@ func (a *DataAPI) upload(c *gin.Context) {
 	}
 	form, err := c.MultipartForm()
 	if err != nil {
+		slog.Error("parse multipart form failed", "error", err)
 		api.RespondError(c, http.StatusBadRequest, "invalid multipart form", "bad_request")
 		return
 	}
@@ -31,8 +34,9 @@ func (a *DataAPI) upload(c *gin.Context) {
 			api.RespondError(c, http.StatusBadRequest, "unsupported file type", "bad_request")
 			return
 		}
+		slog.Info("upload request", "filename", fileHeader.Filename, "size_bytes", fileHeader.Size, "max_mb", a.maxMB)
 		if a.maxMB > 0 && fileHeader.Size > a.maxMB*1024*1024 {
-			api.RespondError(c, http.StatusRequestEntityTooLarge, "uploaded file is too large", "payload_too_large")
+			api.RespondError(c, http.StatusRequestEntityTooLarge, fmt.Sprintf("uploaded file is too large (size: %.2f MB, limit: %d MB)", float64(fileHeader.Size)/(1024*1024), a.maxMB), "payload_too_large")
 			return
 		}
 

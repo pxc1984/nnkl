@@ -8,11 +8,11 @@ import (
 )
 
 func (a *DataAPI) download(c *gin.Context) {
-	blob, err := a.store.GetInputBlobByID(c.Request.Context(), c.Param("id"))
+	upload, err := a.store.GetUploadByID(c.Request.Context(), c.Param("id"))
 	if err != nil {
 		respondStoreNotFound(c, err, "object not found")
 		return
 	}
-	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%q", blob.Filename))
-	c.Data(http.StatusOK, blob.ContentType, blob.Content)
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%q", upload.InputBlob.Filename))
+	c.Data(http.StatusOK, upload.InputBlob.ContentType, upload.InputBlob.Content)
 }

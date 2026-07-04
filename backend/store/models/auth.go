@@ -1,4 +1,4 @@
-package store
+package models
 
 import "time"
 
@@ -10,6 +10,7 @@ type User struct {
 	PasswordHash  string     `gorm:"not null" json:"-"`
 	EmailVerified bool       `gorm:"not null;default:true" json:"emailVerified"`
 	AvatarURL     *string    `json:"avatarUrl"`
+	AvatarData    []byte     `gorm:"type:bytea" json:"-"`
 	LastLoginAt   *time.Time `json:"lastLoginAt"`
 	CreatedAt     time.Time  `json:"createdAt"`
 	UpdatedAt     time.Time  `json:"updatedAt"`
@@ -26,6 +27,12 @@ type Session struct {
 	ExpiresAt        time.Time  `gorm:"index;not null" json:"expiresAt"`
 	RevokedAt        *time.Time `json:"-"`
 	User             User       `gorm:"foreignKey:UserID" json:"-"`
+}
+
+type UpdateUserParams struct {
+	Name       *string
+	AvatarData []byte
+	AvatarURL  *string
 }
 
 type CreateUserParams struct {

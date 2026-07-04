@@ -6,6 +6,7 @@ import {
   logoutCurrentSession,
   refreshAuthTokens,
   registerUser,
+  updateUserProfile,
   isUnauthorizedError,
 } from "$lib/api/auth";
 import {
@@ -123,6 +124,19 @@ export async function logout(): Promise<void> {
     // Local cleanup should still happen if the session is already gone server-side.
   }
   clearAuth();
+}
+
+export async function updateProfile(
+  name?: string,
+  avatarFile?: File,
+): Promise<UserProfile> {
+  await updateUserProfile(name, avatarFile);
+  const user = await getCurrentUser();
+  const storedSession = getStoredAuthSession();
+  if (storedSession) {
+    persistSession({ ...storedSession, user });
+  }
+  return user;
 }
 
 function persistSession(session: AuthSession): void {

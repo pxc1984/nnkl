@@ -36,7 +36,48 @@ type LightRAGQueryRequest struct {
 	EnableRerank      bool   `json:"enable_rerank"`
 }
 type LightRAGQueryResponse struct {
-	Response string `json:"response"`
+	Response   string          `json:"response"`
+	References json.RawMessage `json:"references,omitempty"`
+}
+
+type LightRAGQueryDataEntity struct {
+	EntityName  string `json:"entity_name"`
+	EntityType  string `json:"entity_type"`
+	Description string `json:"description,omitempty"`
+	SourceID    string `json:"source_id,omitempty"`
+	FilePath    string `json:"file_path,omitempty"`
+	ReferenceID string `json:"reference_id,omitempty"`
+}
+
+type LightRAGQueryDataRelationship struct {
+	SrcID       string  `json:"src_id"`
+	TgtID       string  `json:"tgt_id"`
+	Description string  `json:"description,omitempty"`
+	Keywords    string  `json:"keywords,omitempty"`
+	Weight      float64 `json:"weight,omitempty"`
+	SourceID    string  `json:"source_id,omitempty"`
+	FilePath    string  `json:"file_path,omitempty"`
+	ReferenceID string  `json:"reference_id,omitempty"`
+}
+
+type LightRAGQueryDataData struct {
+	Entities      []LightRAGQueryDataEntity       `json:"entities"`
+	Relationships []LightRAGQueryDataRelationship `json:"relationships"`
+	Chunks        []json.RawMessage               `json:"chunks,omitempty"`
+	References    []json.RawMessage               `json:"references,omitempty"`
+}
+
+type LightRAGQueryDataMetadata struct {
+	QueryMode      string          `json:"query_mode"`
+	Keywords       json.RawMessage `json:"keywords,omitempty"`
+	ProcessingInfo json.RawMessage `json:"processing_info,omitempty"`
+}
+
+type LightRAGQueryDataResponse struct {
+	Status   string                    `json:"status"`
+	Message  string                    `json:"message"`
+	Data     LightRAGQueryDataData     `json:"data"`
+	Metadata LightRAGQueryDataMetadata `json:"metadata"`
 }
 
 func NewLightRAGClient(baseURL, apiKey string, client *http.Client) *LightRAGClient {
@@ -72,11 +113,41 @@ func (c *LightRAGClient) SendText(ctx context.Context, text, fileSource string) 
 	}
 }
 
+func (c *LightRAGClient) QueryData(ctx context.Context, query, mode string) (*LightRAGQueryDataResponse, error) {
+	if mode == "" {
+		mode = "hybrid"
+	}
+	body, err := json.Marshal(LightRAGQueryRequest{Query: query, Mode: mode, IncludeReferences: true})
+	if err != nil {
+		return nil, fmt.Errorf("marshal lightrag query data request: %w", err)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/query/data", bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("create lightrag query data request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	c.setAPIKey(req)
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("send lightrag query data request: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("unexpected lightrag query data status %d: %s", resp.StatusCode, string(respBody))
+	}
+	var result LightRAGQueryDataResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("decode lightrag query data response: %w", err)
+	}
+	return &result, nil
+}
+
 func (c *LightRAGClient) Query(ctx context.Context, query, mode string) (*LightRAGQueryResponse, error) {
 	if mode == "" {
 		mode = "naive"
 	}
-	body, err := json.Marshal(LightRAGQueryRequest{Query: query, Mode: mode})
+	body, err := json.Marshal(LightRAGQueryRequest{Query: query, Mode: mode, IncludeReferences: true})
 	if err != nil {
 		return nil, fmt.Errorf("marshal lightrag query request: %w", err)
 	}

@@ -1,12 +1,16 @@
 package data
 
-import "github.com/pxc1984/nnkl-backend/store"
+import (
+	"github.com/pxc1984/nnkl-backend/store"
+	"github.com/pxc1984/nnkl-backend/worker"
+)
 
 type DataAPI struct {
 	store    store.Store
 	ocr      *OCRClient
 	lightrag *LightRAGClient
 	maxMB    int64
+	queue    *worker.Queue
 }
 
 type DataUploadParams struct {

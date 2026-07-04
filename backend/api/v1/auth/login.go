@@ -9,7 +9,7 @@ import (
 	"github.com/pxc1984/nnkl-backend/api"
 	shared "github.com/pxc1984/nnkl-backend/api/v1/shared"
 	auth2 "github.com/pxc1984/nnkl-backend/auth"
-	"github.com/pxc1984/nnkl-backend/store"
+	"github.com/pxc1984/nnkl-backend/store/models"
 )
 
 func (a *AuthAPI) login(c *gin.Context) {
@@ -35,7 +35,7 @@ func (a *AuthAPI) login(c *gin.Context) {
 		api.RespondError(c, http.StatusInternalServerError, "failed to create session", "internal_error")
 		return
 	}
-	session, err := a.store.CreateSession(c.Request.Context(), store.CreateSessionParams{
+	session, err := a.store.CreateSession(c.Request.Context(), models.CreateSessionParams{
 		UserID:           user.ID,
 		RefreshTokenHash: refreshHash,
 		IP:               c.ClientIP(),

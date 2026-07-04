@@ -7,6 +7,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/pxc1984/nnkl-backend/api"
+	"github.com/pxc1984/nnkl-backend/store/models"
+	"github.com/pxc1984/nnkl-backend/worker"
 	"gorm.io/gorm"
 )
 
@@ -42,23 +44,47 @@ func (a *DataAPI) upload(c *gin.Context) {
 
 		blob, err := a.persistFile(c, fileHeader, fileType, params.Tags)
 		if err != nil {
-			if err == gorm.ErrDuplicatedKey {
-				api.RespondError(c, http.StatusConflict, "blob already exists", "conflict")
-				return
-			}
 			api.RespondError(c, http.StatusInternalServerError, "failed to store blob", "internal_error")
 			return
 		}
 
-		if err := a.reprocessBlob(c, blob.ID, defaultString(params.OutputFormat, "markdown"), defaultString(params.Language, "auto")); err != nil {
+		upload, err := a.store.CreateUpload(c.Request.Context(), models.CreateUploadParams{
+			ID:          blob.ID,
+			InputBlobID: blob.ID,
+			Status:      "pending",
+			Language:    defaultString(params.Language, "auto"),
+		})
+		if err != nil {
+			if err == gorm.ErrDuplicatedKey {
+				api.RespondError(c, http.StatusConflict, "upload already exists", "conflict")
+				return
+			}
+			api.RespondError(c, http.StatusInternalServerError, "failed to create upload", "internal_error")
 			return
 		}
 
+		// Enqueue for background processing instead of blocking on OCR/extraction.
+		job := worker.Job{
+			UploadID:     upload.ID,
+			OutputFormat: defaultString(params.OutputFormat, "markdown"),
+			Language:     defaultString(params.Language, "auto"),
+			FileType:     blob.FileType,
+		}
+		switch blob.FileType {
+		case "docx", "pptx":
+			a.queue.EnqueueSimple(job)
+		case "pdf":
+			a.queue.EnqueueOCR(job)
+		case "markdown":
+			// Markdown is already text — finalize inline so the response is immediate.
+			a.finalizeMarkdown(c, upload.ID, job.Language, job.OutputFormat)
+		}
+
 		response.Items = append(response.Items, DataUploadItem{
-			ID:       blob.ID,
+			ID:       upload.ID,
 			Filename: blob.Filename,
 			Type:     blob.FileType,
-			Status:   "created",
+			Status:   upload.Status,
 		})
 	}
 

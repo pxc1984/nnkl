@@ -15,10 +15,9 @@ type OCRClient struct {
 }
 
 type OCRParseRequest struct {
-	DocumentID   string `json:"document_id"`
-	InputBlobID  string `json:"input_blob_id"`
-	OutputFormat string `json:"output_format"`
-	Language     string `json:"language"`
+	UploadID    string `json:"upload_id"`
+	InputBlobID string `json:"input_blob_id"`
+	Language    string `json:"language"`
 }
 
 func NewOCRClient(baseURL string, client *http.Client) *OCRClient {

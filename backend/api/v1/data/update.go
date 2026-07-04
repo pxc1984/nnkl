@@ -6,11 +6,12 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/pxc1984/nnkl-backend/api"
 	shared "github.com/pxc1984/nnkl-backend/api/v1/shared"
-	"github.com/pxc1984/nnkl-backend/store"
+	"github.com/pxc1984/nnkl-backend/store/models"
+	"github.com/pxc1984/nnkl-backend/worker"
 )
 
 func (a *DataAPI) update(c *gin.Context) {
-	current, err := a.store.GetInputBlobByID(c.Request.Context(), c.Param("id"))
+	current, err := a.store.GetUploadByID(c.Request.Context(), c.Param("id"))
 	if err != nil {
 		respondStoreNotFound(c, err, "object not found")
 		return
@@ -26,8 +27,7 @@ func (a *DataAPI) update(c *gin.Context) {
 		form = nil
 	}
 
-	update := store.UpdateInputBlobParams{Tags: chooseTags(params.Tags, current.Tags)}
-	newBlobType := current.FileType
+	newBlobType := current.InputBlob.FileType
 
 	if form != nil {
 		files := form.File["data"]
@@ -51,38 +51,64 @@ func (a *DataAPI) update(c *gin.Context) {
 				api.RespondError(c, http.StatusInternalServerError, "failed to read uploaded file", "internal_error")
 				return
 			}
-			filename := fileHeader.Filename
-			sizeBytes := int64(len(content))
-			update.ReplaceFile = true
-			update.Content = content
-			update.ContentType = &contentType
-			update.Filename = &filename
-			update.FileType = &newBlobType
-			update.SizeBytes = &sizeBytes
-			update.SHA256 = &sha
-		}
-	}
-
-	blob, err := a.store.UpdateInputBlob(c.Request.Context(), current.ID, update)
-	if err != nil {
-		api.RespondError(c, http.StatusInternalServerError, "failed to update object", "internal_error")
-		return
-	}
-
-	if update.ReplaceFile {
-		if err := a.reprocessBlob(c, blob.ID, defaultString(params.OutputFormat, "markdown"), defaultString(params.Language, "auto")); err != nil {
+			blob, err := a.store.GetBlobBySHA256(c.Request.Context(), sha)
+			if err != nil {
+				blob, err = a.store.CreateBlob(c.Request.Context(), models.CreateBlobParams{
+					Filename:    fileHeader.Filename,
+					FileType:    newBlobType,
+					ContentType: contentType,
+					SizeBytes:   int64(len(content)),
+					SHA256:      &sha,
+					Content:     content,
+				})
+				if err != nil {
+					api.RespondError(c, http.StatusInternalServerError, "failed to store uploaded file", "internal_error")
+					return
+				}
+			}
+			inputBlobID := blob.ID
+			language := defaultString(params.Language, current.Language)
+			status := "pending"
+			var outputBlobID *string
+			if isMarkdownBlob(blob) {
+				status = "completed"
+				outputBlobID = &inputBlobID
+			}
+			upload, err := a.store.UpdateUpload(c.Request.Context(), current.ID, models.UpdateUploadParams{
+				InputBlobID:  &inputBlobID,
+				OutputBlobID: outputBlobID,
+				Status:       &status,
+				Language:     &language,
+				Error:        stringPtr(""),
+			})
+			if err != nil {
+				api.RespondError(c, http.StatusInternalServerError, "failed to update object", "internal_error")
+				return
+			}
+			if !isMarkdownBlob(blob) {
+				job := worker.Job{
+					UploadID:     upload.ID,
+					OutputFormat: defaultString(params.OutputFormat, "markdown"),
+					Language:     language,
+					FileType:     blob.FileType,
+				}
+				switch blob.FileType {
+				case "docx", "pptx":
+					a.queue.EnqueueSimple(job)
+				case "pdf":
+					a.queue.EnqueueOCR(job)
+				}
+			}
+			c.JSON(http.StatusOK, shared.KnowledgeObject{
+				KnowledgeObjectResponse: shared.ToKnowledgeObjectResponse(&upload.InputBlob),
+				Status:                  upload.Status,
+			})
 			return
 		}
 	}
 
-	status := "updated"
-	job, err := a.store.GetParseJobByDocumentID(c.Request.Context(), blob.ID)
-	if err == nil {
-		status = job.Status
-	}
-
 	c.JSON(http.StatusOK, shared.KnowledgeObject{
-		KnowledgeObjectResponse: shared.ToKnowledgeObjectResponse(blob),
-		Status:                  status,
+		KnowledgeObjectResponse: shared.ToKnowledgeObjectResponse(&current.InputBlob),
+		Status:                  current.Status,
 	})
 }

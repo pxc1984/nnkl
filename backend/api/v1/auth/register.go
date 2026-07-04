@@ -9,7 +9,7 @@ import (
 	"github.com/pxc1984/nnkl-backend/api"
 	shared "github.com/pxc1984/nnkl-backend/api/v1/shared"
 	auth2 "github.com/pxc1984/nnkl-backend/auth"
-	"github.com/pxc1984/nnkl-backend/store"
+	"github.com/pxc1984/nnkl-backend/store/models"
 	"gorm.io/gorm"
 )
 
@@ -37,7 +37,7 @@ func (a *AuthAPI) register(c *gin.Context) {
 		return
 	}
 
-	user, err := a.store.CreateUser(c.Request.Context(), store.CreateUserParams{
+	user, err := a.store.CreateUser(c.Request.Context(), models.CreateUserParams{
 		Email:        strings.ToLower(strings.TrimSpace(req.Email)),
 		Name:         strings.TrimSpace(req.Name),
 		Role:         role,

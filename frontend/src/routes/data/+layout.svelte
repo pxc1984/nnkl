@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Snippet } from "svelte";
 	import { page } from "$app/state";
+	import { authState } from "$lib/auth/store";
 	import AppSidebar from "$lib/components/app-sidebar.svelte";
 	import * as Breadcrumb from "$lib/components/ui/breadcrumb/index.js";
 	import { Separator } from "$lib/components/ui/separator/index.js";
@@ -27,6 +28,10 @@
 			return [{ label: "Карта знаний", href: "/data/graph" }] as BCItem[];
 		}
 
+		if (path === "/data/account") {
+			return [{ label: "Аккаунт" }] as BCItem[];
+		}
+
 		if (path.startsWith("/data/")) {
 			return [{ label: "Материалы", href: "/data" }, { label: "Документ" }] as BCItem[];
 		}
@@ -40,7 +45,7 @@
 </script>
 
 <Sidebar.Provider>
-	<AppSidebar />
+	<AppSidebar currentUser={$authState.user} />
 	<Sidebar.Inset class="bg-background min-h-svh md:min-h-[calc(100svh-1rem)]">
 		<header
 			class="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12"

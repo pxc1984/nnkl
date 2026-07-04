@@ -8,10 +8,9 @@ from datetime import datetime
 from sqlalchemy import (
     DateTime,
     ForeignKey,
+    Index,
     LargeBinary,
     String,
-    Text,
-    UniqueConstraint,
     Uuid,
     func,
 )
@@ -22,36 +21,47 @@ class Base(DeclarativeBase):
     """Base class for ORM models."""
 
 
-class InputBlob(Base):
-    __tablename__ = "input_blobs"
+class Blob(Base):
+    __tablename__ = "blobs"
+    __table_args__ = (Index("ix_blobs_sha256", "sha256"),)
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
     filename: Mapped[str] = mapped_column(String(512))
-    content_type: Mapped[str] = mapped_column(String(255), default="application/pdf")
+    file_type: Mapped[str] = mapped_column(String(32), index=True)
+    content_type: Mapped[str] = mapped_column(
+        String(255), default="application/pdf", index=True
+    )
+    size_bytes: Mapped[int] = mapped_column()
     sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
     content: Mapped[bytes] = mapped_column(LargeBinary)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
-
-    jobs: Mapped[list[ParseJob]] = relationship(back_populates="input_blob")
-
-
-class ParseJob(Base):
-    __tablename__ = "parse_jobs"
-    __table_args__ = (
-        UniqueConstraint("document_id", name="uq_parse_jobs_document_id"),
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
+    input_uploads: Mapped[list[Upload]] = relationship(
+        back_populates="input_blob", foreign_keys="Upload.input_blob_id"
+    )
+    output_uploads: Mapped[list[Upload]] = relationship(
+        back_populates="output_blob", foreign_keys="Upload.output_blob_id"
+    )
+
+
+class Upload(Base):
+    __tablename__ = "uploads"
+
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
-    document_id: Mapped[str] = mapped_column(String(255), index=True)
     input_blob_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("input_blobs.id"), index=True
+        "input_blob", ForeignKey("blobs.id"), index=True
+    )
+    output_blob_id: Mapped[uuid.UUID | None] = mapped_column(
+        "output_blob", ForeignKey("blobs.id"), nullable=True, index=True
     )
     status: Mapped[str] = mapped_column(String(32), default="pending")
-    output_format: Mapped[str] = mapped_column(String(32))
     language: Mapped[str] = mapped_column(String(32))
-    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    error: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -59,27 +69,9 @@ class ParseJob(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
-    input_blob: Mapped[InputBlob] = relationship(back_populates="jobs")
-    result: Mapped[ParseResult | None] = relationship(
-        back_populates="job", uselist=False
+    input_blob: Mapped[Blob] = relationship(
+        back_populates="input_uploads", foreign_keys=[input_blob_id]
     )
-
-
-class ParseResult(Base):
-    __tablename__ = "parse_results"
-
-    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
-    job_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("parse_jobs.id"), unique=True, index=True
+    output_blob: Mapped[Blob | None] = relationship(
+        back_populates="output_uploads", foreign_keys=[output_blob_id]
     )
-    content_type: Mapped[str] = mapped_column(String(255))
-    content_text: Mapped[str] = mapped_column(Text)
-    assets_zip: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
-    )
-
-    job: Mapped[ParseJob] = relationship(back_populates="result")

@@ -7,7 +7,7 @@ import (
 )
 
 func (a *DataAPI) delete(c *gin.Context) {
-	if err := a.store.DeleteInputBlobByID(c.Request.Context(), c.Param("id")); err != nil {
+	if err := a.store.DeleteUploadByID(c.Request.Context(), c.Param("id")); err != nil {
 		respondStoreNotFound(c, err, "object not found")
 		return
 	}

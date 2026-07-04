@@ -5,24 +5,38 @@ import (
 
 	"github.com/gin-gonic/gin"
 	shared "github.com/pxc1984/nnkl-backend/api/v1/shared"
+	"github.com/pxc1984/nnkl-backend/worker"
 )
 
 func (a *DataAPI) reprocess(c *gin.Context) {
-	blob, err := a.store.GetInputBlobByID(c.Request.Context(), c.Param("id"))
+	upload, err := a.store.GetUploadByID(c.Request.Context(), c.Param("id"))
 	if err != nil {
 		respondStoreNotFound(c, err, "object not found")
 		return
 	}
-	if err := a.reprocessBlob(c, blob.ID, "markdown", "auto"); err != nil {
-		return
+
+	// Enqueue for background processing instead of blocking.
+	job := worker.Job{
+		UploadID:     upload.ID,
+		OutputFormat: "markdown",
+		Language:     "auto",
+		FileType:     upload.InputBlob.FileType,
 	}
-	job, _ := a.store.GetParseJobByDocumentID(c.Request.Context(), blob.ID)
-	status := "queued"
-	if job != nil && job.Status != "" {
-		status = job.Status
+	switch upload.InputBlob.FileType {
+	case "docx", "pptx":
+		a.queue.EnqueueSimple(job)
+	case "pdf":
+		a.queue.EnqueueOCR(job)
+	case "markdown":
+		a.finalizeMarkdown(c, upload.ID, "auto", "markdown")
+	}
+
+	status := upload.Status
+	if status == "" {
+		status = "queued"
 	}
 	c.JSON(http.StatusAccepted, shared.KnowledgeObject{
-		KnowledgeObjectResponse: shared.ToKnowledgeObjectResponse(blob),
+		KnowledgeObjectResponse: shared.ToKnowledgeObjectResponse(&upload.InputBlob),
 		Status:                  status,
 	})
 }

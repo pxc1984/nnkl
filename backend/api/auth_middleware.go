@@ -8,9 +8,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/pxc1984/nnkl-backend/auth"
 	"github.com/pxc1984/nnkl-backend/store"
+	"github.com/pxc1984/nnkl-backend/store/models"
 )
 
-func AuthenticateRequest(c *gin.Context, st store.Store, tokens *auth.Manager) (*store.User, bool) {
+func AuthenticateRequest(c *gin.Context, st store.Store, tokens *auth.Manager) (*models.User, bool) {
 	claims, session, ok := authenticateSession(c, st, tokens)
 	if !ok {
 		return nil, false
@@ -37,7 +38,7 @@ func RequireAuth(st store.Store, tokens *auth.Manager) gin.HandlerFunc {
 	}
 }
 
-func authenticateSession(c *gin.Context, st store.Store, tokens *auth.Manager) (*auth.AccessClaims, *store.Session, bool) {
+func authenticateSession(c *gin.Context, st store.Store, tokens *auth.Manager) (*auth.AccessClaims, *models.Session, bool) {
 	authorization := strings.TrimSpace(c.GetHeader("Authorization"))
 	if !strings.HasPrefix(authorization, "Bearer ") {
 		RespondError(c, http.StatusUnauthorized, "missing bearer token", "unauthorized")

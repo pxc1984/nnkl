@@ -3,8 +3,7 @@
     import BookOpenIcon from "@lucide/svelte/icons/book-open";
     import NetworkIcon from "@lucide/svelte/icons/network";
     import Settings2Icon from "@lucide/svelte/icons/settings-2";
-    import SquareTerminalIcon from "@lucide/svelte/icons/square-terminal";
-    import {SearchIcon} from "@lucide/svelte";
+    import {Database, SearchIcon} from "@lucide/svelte";
 
     type Pathname = ReturnType<AppTypes["Pathname"]>;
     type NavUrl = "#" | Pathname | `http${string}`;
@@ -46,7 +45,7 @@
         user: {
             name: "Владимир Потанин",
             email: "potanin@nornickel.ru",
-            avatar: "/potanin.jpg",
+            avatar: undefined,
         },
         navMain: [
             {
@@ -62,11 +61,11 @@
             {
                 title: "Материалы",
                 url: "/data",
-                icon: SquareTerminalIcon,
+                icon: Database,
                 isActive: true,
                 items: [
                     {
-                        title: "Ваши материалы",
+                        title: "Список",
                         url: "/data",
                     },
                     {
@@ -77,12 +76,12 @@
             },
             {
                 title: "Документация",
-                url: "#",
+                url: "https://github.com/pxc1984/nnkl",
                 icon: BookOpenIcon,
                 items: [
                     {
                         title: "Техническое задание",
-                        url: "#",
+                        url: "https://nornickel-ai-hackathon.ru/task-2",
                     },
                     {
                         title: "Быстрый старт",
@@ -101,10 +100,6 @@
                 items: [
                     {
                         title: "Общие",
-                        url: "#",
-                    },
-                    {
-                        title: "Доступы",
                         url: "#",
                     },
                 ],
@@ -195,7 +190,7 @@
             ? {
                 name: currentUser.name?.trim() || currentUser.email,
                 email: currentUser.email,
-                avatar: currentUser.avatarUrl || "/potanin.jpg",
+                avatar: currentUser.avatarUrl ?? undefined,
             }
             : appSidebarData.user,
     );

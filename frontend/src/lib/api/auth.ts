@@ -42,6 +42,21 @@ export async function getCurrentUser(): Promise<UserProfile> {
   return response.data;
 }
 
+export async function updateUserProfile(
+  name?: string,
+  avatarFile?: File,
+): Promise<UserProfile> {
+  const formData = new FormData();
+  if (name !== undefined) {
+    formData.append("name", name);
+  }
+  if (avatarFile) {
+    formData.append("avatar", avatarFile);
+  }
+  const response = await api.patch<UserProfile>("/api/v1/auth/me", formData);
+  return response.data;
+}
+
 export async function logoutCurrentSession(
   refreshToken?: string,
 ): Promise<void> {

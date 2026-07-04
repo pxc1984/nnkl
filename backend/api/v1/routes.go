@@ -10,3 +10,8 @@ func RegisterRoutes(router gin.IRouter) {
 	auth.RegisterAuthRoutes(router)
 	data.RegisterDataRoutes(router)
 }
+
+// StopDataQueue stops the background processing queue. Called during server shutdown.
+func StopDataQueue() {
+	data.StopQueue()
+}

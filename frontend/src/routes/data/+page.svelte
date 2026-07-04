@@ -5,6 +5,7 @@
 	import DataTableActions from "$lib/components/data/data-table-actions.svelte";
 	import DataStatusBadge from "$lib/components/data/data-status-badge.svelte";
 	import { Button } from "$lib/components/ui/button/index.js";
+	import { Input } from "$lib/components/ui/input/index.js";
 	import { Skeleton } from "$lib/components/ui/skeleton/index.js";
 	import * as Table from "$lib/components/ui/table/index.js";
 	import {
@@ -19,12 +20,24 @@
 	} from "@tanstack/table-core";
 	import { getCoreRowModel } from "@tanstack/table-core";
 	import type { KnowledgeObject, PaginationMeta } from "$lib/data/types";
-	import { formatBytes, formatDateTime, getObjectTitle } from "$lib/data/utils";
+	import {
+		formatBytes,
+		formatDateTime,
+		getObjectTitle,
+		parseTagsInput,
+	} from "$lib/data/utils";
 	import { cn } from "$lib/utils.js";
 	import { createRawSnippet } from "svelte";
-    import { ChevronLeftIcon, ChevronRightIcon } from "@lucide/svelte";
+	import { ChevronLeftIcon, ChevronRightIcon } from "@lucide/svelte";
 
 	const PAGE_SIZE = 20;
+	const FILE_TYPE_OPTIONS = [
+		{ value: "", label: "Все типы" },
+		{ value: "pdf", label: "PDF" },
+		{ value: "docx", label: "DOCX" },
+		{ value: "pptx", label: "PPTX" },
+		{ value: "markdown", label: "Markdown" },
+	];
 
 	let objects = $state<KnowledgeObject[]>([]);
 	let paginationMeta = $state<PaginationMeta>({ page: 1, pageSize: PAGE_SIZE, total: 0, totalPages: 1 });
@@ -36,6 +49,14 @@
 	let deletingId = $state<string | null>(null);
 	let requestRun = 0;
 	let deleteConfirmTimeout = $state<number | null>(null);
+	let queryInput = $state("");
+	let appliedQuery = $state("");
+	let typeFilter = $state("");
+	let tagsInput = $state("");
+	let queryDebounceTimeout: number | null = null;
+
+	const tagFilters = $derived(parseTagsInput(tagsInput));
+	const hasActiveFilters = $derived(Boolean(appliedQuery || typeFilter || tagFilters.length > 0));
 
 	function clearDeleteConfirmation(): void {
 		if (deleteConfirmTimeout !== null) {
@@ -89,13 +110,30 @@
 		}
 	}
 
-	async function loadData(pageNum: number): Promise<void> {
+	async function loadData(
+		pageNum: number,
+		filters: {
+			query: string;
+			type: string;
+			tags: string[];
+		} = {
+			query: appliedQuery,
+			type: typeFilter,
+			tags: tagFilters,
+		},
+	): Promise<void> {
 		const currentRun = ++requestRun;
 		isLoading = true;
 		errorMessage = "";
 
 		try {
-			const response = await listKnowledgeObjects({ page: pageNum, pageSize: PAGE_SIZE });
+			const response = await listKnowledgeObjects({
+				page: pageNum,
+				pageSize: PAGE_SIZE,
+				query: filters.query || undefined,
+				type: filters.type || undefined,
+				tags: filters.tags.length > 0 ? filters.tags : undefined,
+			});
 			if (currentRun !== requestRun) {
 				return;
 			}
@@ -116,18 +154,75 @@
 		}
 	}
 
+	function resetToFirstPage(): void {
+		if (currentPage === 1 && pagination.pageIndex === 0) {
+			return;
+		}
+
+		currentPage = 1;
+		pagination = { ...pagination, pageIndex: 0 };
+	}
+
+	function handleTypeFilterChange(value: string): void {
+		typeFilter = value;
+		resetToFirstPage();
+	}
+
+	function handleTagsInput(value: string): void {
+		tagsInput = value;
+		resetToFirstPage();
+	}
+
+	function clearFilters(): void {
+		queryInput = "";
+		appliedQuery = "";
+		typeFilter = "";
+		tagsInput = "";
+		resetToFirstPage();
+	}
+
 	$effect(() => {
 		if (!browser) {
 			return;
 		}
 
-		void loadData(currentPage);
+		if (queryDebounceTimeout !== null) {
+			window.clearTimeout(queryDebounceTimeout);
+		}
+
+		queryDebounceTimeout = window.setTimeout(() => {
+			appliedQuery = queryInput.trim();
+			queryDebounceTimeout = null;
+		}, 300);
+
+		return () => {
+			if (queryDebounceTimeout !== null) {
+				window.clearTimeout(queryDebounceTimeout);
+			}
+		};
+	});
+
+	$effect(() => {
+		if (!browser) {
+			return;
+		}
+
+		const pageNum = currentPage;
+		const query = appliedQuery;
+		const type = typeFilter;
+		const tags = [...tagFilters];
+
+		void loadData(pageNum, { query, type, tags });
 	});
 
 	$effect(() => {
 		return () => {
 			if (deleteConfirmTimeout !== null) {
 				window.clearTimeout(deleteConfirmTimeout);
+			}
+
+			if (queryDebounceTimeout !== null) {
+				window.clearTimeout(queryDebounceTimeout);
 			}
 		};
 	});
@@ -223,6 +318,54 @@
 		</div>
 	{/if}
 
+	<div class="flex flex-col gap-3 rounded-2xl border border-border/50 p-4 md:flex-row md:items-end">
+		<div class="flex-1 space-y-1.5">
+			<label class="text-sm font-medium" for="data-query-filter">Поиск</label>
+			<Input
+				id="data-query-filter"
+				placeholder="Название файла..."
+				bind:value={queryInput}
+				oninput={resetToFirstPage}
+				class="max-w-none"
+			/>
+		</div>
+
+		<div class="space-y-1.5 md:w-48">
+			<label class="text-sm font-medium" for="data-type-filter">Тип</label>
+			<select
+				id="data-type-filter"
+				class="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex h-8 w-full rounded-md border px-3 py-1 text-sm focus-visible:ring-2 focus-visible:outline-none"
+				value={typeFilter}
+				onchange={(event) => handleTypeFilterChange(event.currentTarget.value)}
+			>
+				{#each FILE_TYPE_OPTIONS as option (option.value)}
+					<option value={option.value}>{option.label}</option>
+				{/each}
+			</select>
+		</div>
+
+		<div class="flex-1 space-y-1.5">
+			<label class="text-sm font-medium" for="data-tags-filter">Теги</label>
+			<Input
+				id="data-tags-filter"
+				placeholder="tag1, tag2"
+				value={tagsInput}
+				oninput={(event) => handleTagsInput(event.currentTarget.value)}
+				onchange={(event) => handleTagsInput(event.currentTarget.value)}
+				class="max-w-none"
+			/>
+		</div>
+
+		<Button
+			variant="outline"
+			disabled={!hasActiveFilters}
+			onclick={clearFilters}
+			class="md:self-end"
+		>
+			Сбросить
+		</Button>
+	</div>
+
 	{#if isLoading}
 		<div>
 			<div class="flex items-center gap-4 border-b border-border/10 pb-3">
@@ -275,7 +418,7 @@
 				{:else}
 					<Table.Row>
 						<Table.Cell colspan={columns.length} class="h-24 text-center">
-							Нет результатов.
+							{hasActiveFilters ? "Нет результатов по выбранным фильтрам." : "Нет результатов."}
 						</Table.Cell>
 					</Table.Row>
 				{/each}

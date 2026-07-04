@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"sort"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/pxc1984/nnkl-backend/api"
@@ -24,6 +26,14 @@ type AskResponse struct {
 	Mode       string          `json:"mode"`
 	SessionID  string          `json:"sessionId"`
 	References json.RawMessage `json:"references,omitempty"`
+}
+
+// EnrichedReference — единый формат источника для фронтенда.
+type EnrichedReference struct {
+	ID        string    `json:"id"`
+	Filename  string    `json:"filename"`
+	Type      string    `json:"type"`
+	CreatedAt time.Time `json:"createdAt"`
 }
 
 func (a *DataAPI) ask(c *gin.Context) {
@@ -83,166 +93,84 @@ func (a *DataAPI) ask(c *gin.Context) {
 	c.JSON(http.StatusOK, askResp)
 }
 
-// processReferences enhances the references with document information for frontend linking
+// processReferences превращает сырые references от LightRAG в единый массив
+// обогащённых источников с id, именем файла, типом и датой загрузки.
 func (a *DataAPI) processReferences(ctx context.Context, rawRefs json.RawMessage) (json.RawMessage, error) {
 	if len(rawRefs) == 0 {
 		return rawRefs, nil
 	}
 
-	// Try to unmarshal the references
 	var refsData interface{}
 	if err := json.Unmarshal(rawRefs, &refsData); err != nil {
 		return rawRefs, fmt.Errorf("failed to unmarshal references: %w", err)
 	}
 
-	// If refsData is a string that looks like a document ID, create a structured reference
-	if strRef, ok := refsData.(string); ok {
-		docID := extractDocumentID(strRef)
-		if docID != "" {
-			// Try to get document info if possible
-			blob, err := a.store.GetBlobByID(ctx, docID)  // Fixed method name
-			if err == nil {
-				enhancedRef := map[string]interface{}{
-					"id":       docID,
-					"filename": blob.Filename,
-					"type":     "document",
-				}
-				return json.Marshal([]interface{}{enhancedRef})
-			} else {
-				enhancedRef := map[string]interface{}{
-					"id":   docID,
-					"type": "document",
-				}
-				return json.Marshal([]interface{}{enhancedRef})
-			}
-		}
+	docIDs := make(map[string]struct{})
+	collectDocumentIDs(refsData, docIDs)
+	if len(docIDs) == 0 {
 		return rawRefs, nil
 	}
 
-	// If refsData is an array, process each item
-	if refsArray, ok := refsData.([]interface{}); ok {
-		for i, refItem := range refsArray {
-			if refMap, ok := refItem.(map[string]interface{}); ok {
-				// Check if this reference contains a document identifier
-				docID := ""
-				
-				// Look for various possible fields that might contain document IDs
-				if filePath, ok := refMap["file_path"].(string); ok {
-					docID = extractDocumentID(filePath)
-				} else if sourceID, ok := refMap["source_id"].(string); ok {
-					docID = extractDocumentID(sourceID)
-				} else if refID, ok := refMap["reference_id"].(string); ok {
-					docID = extractDocumentID(refID)
-				} else if id, ok := refMap["id"].(string); ok {
-					docID = extractDocumentID(id)
-				} else {
-					// If the refMap itself looks like a document ID when converted to string
-					refStr := fmt.Sprintf("%v", refMap)
-					docID = extractDocumentID(refStr)
-				}
-				
-				if docID != "" {
-					// Enhance with document information if available
-					blob, err := a.store.GetBlobByID(ctx, docID)  // Fixed method name
-					if err == nil {
-						refMap["document_id"] = docID
-						refMap["document_filename"] = blob.Filename
-					} else {
-						refMap["document_id"] = docID
-					}
-				}
-				
-				refsArray[i] = refMap
-			}
+	enriched := make([]EnrichedReference, 0, len(docIDs))
+	for id := range docIDs {
+		ref := EnrichedReference{ID: id}
+		if blob, err := a.store.GetBlobByID(ctx, id); err == nil {
+			ref.Filename = blob.Filename
+			ref.Type = blob.FileType
+			ref.CreatedAt = blob.CreatedAt
 		}
-		return json.Marshal(refsArray)
+		enriched = append(enriched, ref)
 	}
 
-	// If refsData is an object, process it similarly
-	if refObj, ok := refsData.(map[string]interface{}); ok {
-		docID := ""
-		
-		// Look for various possible fields that might contain document IDs
-		if filePath, ok := refObj["file_path"].(string); ok {
-			docID = extractDocumentID(filePath)
-		} else if sourceID, ok := refObj["source_id"].(string); ok {
-			docID = extractDocumentID(sourceID)
-		} else if refID, ok := refObj["reference_id"].(string); ok {
-			docID = extractDocumentID(refID)
-		} else if id, ok := refObj["id"].(string); ok {
-			docID = extractDocumentID(id)
+	// Детерминированный порядок: сначала по имени файла, затем по id.
+	sort.Slice(enriched, func(i, j int) bool {
+		if enriched[i].Filename != enriched[j].Filename {
+			return enriched[i].Filename < enriched[j].Filename
 		}
-		
-		if docID != "" {
-			// Enhance with document information if available
-			blob, err := a.store.GetBlobByID(ctx, docID)  // Fixed method name
-			if err == nil {
-				refObj["document_id"] = docID
-				refObj["document_filename"] = blob.Filename
-			} else {
-				refObj["document_id"] = docID
-			}
-		}
-		
-		return json.Marshal(refObj)
-	}
+		return enriched[i].ID < enriched[j].ID
+	})
 
-	return rawRefs, nil
+	return json.Marshal(enriched)
 }
 
-// extractDocumentID extracts document ID from various possible formats
+// collectDocumentIDs рекурсивно извлекает UUID документов из любой структуры references.
+func collectDocumentIDs(v interface{}, out map[string]struct{}) {
+	switch val := v.(type) {
+	case string:
+		if id := extractDocumentID(val); id != "" {
+			out[id] = struct{}{}
+		}
+	case []interface{}:
+		for _, item := range val {
+			collectDocumentIDs(item, out)
+		}
+	case map[string]interface{}:
+		// Сначала проверяем поля, в которых обычно лежит идентификатор.
+		for _, key := range []string{"file_path", "source_id", "reference_id", "id", "document_id"} {
+			if raw, ok := val[key]; ok {
+				collectDocumentIDs(raw, out)
+			}
+		}
+		// Затем ищем UUID в остальных строковых значениях.
+		for _, raw := range val {
+			collectDocumentIDs(raw, out)
+		}
+	}
+}
+
+// extractDocumentID извлекает UUID документа из строки.
 func extractDocumentID(input string) string {
-	// Pattern for document IDs like "doc-..." or SHA-like hashes
-	patterns := []*regexp.Regexp{
-		regexp.MustCompile(`(?i)(?:doc-)?([a-f0-9]{32}|[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})`),
-		regexp.MustCompile(`([a-f0-9]{32})`), // Just the hash
+	// UUID с дефисами — основной формат ID в системе.
+	re := regexp.MustCompile(`(?i)([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})`)
+	if m := re.FindStringSubmatch(input); len(m) > 1 {
+		return strings.ToLower(m[1])
 	}
-	
-	for _, pattern := range patterns {
-		matches := pattern.FindStringSubmatch(input)
-		if len(matches) > 1 {
-			docID := matches[1]
-			
-			// Ensure it's a valid document ID format (must be UUID or SHA256-like)
-			if len(docID) == 32 || isValidUUID(docID) {
-				// If it doesn't have "doc-" prefix but is a 32-char hex string, add it
-				if len(docID) == 32 && !strings.HasPrefix(docID, "doc-") {
-					docID = "doc-" + docID
-				}
-				return docID
-			}
-		}
+	// Fallback: 32-символьный hex без дефисов.
+	re2 := regexp.MustCompile(`(?i)\b([a-f0-9]{32})\b`)
+	if m := re2.FindStringSubmatch(input); len(m) > 1 {
+		return strings.ToLower(m[1])
 	}
-	
 	return ""
-}
-
-// isValidUUID checks if a string is a valid UUID format
-func isValidUUID(u string) bool {
-	// Remove any "doc-" prefix if present
-	id := strings.TrimPrefix(strings.ToLower(u), "doc-")
-	
-	// Expected format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx (8-4-4-4-12 hex chars)
-	if len(id) != 36 {
-		return false
-	}
-	
-	// Check positions of hyphens
-	if id[8] != '-' || id[13] != '-' || id[18] != '-' || id[23] != '-' {
-		return false
-	}
-	
-	// Check that all other positions are hexadecimal characters
-	for i, r := range id {
-		if i == 8 || i == 13 || i == 18 || i == 23 {
-			continue // Skip hyphens
-		}
-		if (r < '0' || r > '9') && (r < 'a' || r > 'f') {
-			return false
-		}
-	}
-	
-	return true
 }
 
 func (a *DataAPI) askStream(c *gin.Context) {

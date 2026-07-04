@@ -7,11 +7,18 @@ export type AskRequest = {
   mode?: "naive" | "local" | "global" | "hybrid";
 };
 
+export type Reference = {
+  id: string;
+  filename: string;
+  type: string;
+  createdAt: string;
+};
+
 export type AskResponse = {
   answer: string;
   mode: string;
   sessionId?: string;
-  references?: any; // Added references field to handle LightRAG response
+  references?: Reference[];
 };
 
 export type QuerySessionResponse = {

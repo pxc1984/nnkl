@@ -3,7 +3,7 @@
 	import {Button} from "$lib/components/ui/button/index.js";
 	import MarkdownRenderer from "$lib/components/markdown-renderer.svelte";
 	import {ArrowUpIcon, GlobeIcon, FileTextIcon} from "@lucide/svelte";
-	import {askQuestion, type AskResponse} from "$lib/api/ask";
+	import {askQuestion, type AskResponse, type Reference} from "$lib/api/ask";
 	import {getApiErrorMessage} from "$lib/api/auth";
 	import {goto} from "$app/navigation";
 
@@ -59,58 +59,62 @@
 		return uuidPattern.test(id) || sha256Pattern.test(id);
 	}
 	
-	// Function to extract document IDs from references and create clickable links
-	function getDocumentLinks() {
+	// Extract document links from references. Supports enriched backend format
+	// ({ id, filename, type, createdAt }) and legacy LightRAG shapes.
+	function getDocumentLinks(): Array<Reference & { link: string }> {
 		if (!answer?.references) return [];
-		
-		// Parse references - they could be in various formats depending on LightRAG
+
 		let refsArray: any[] = [];
-		
 		if (typeof answer.references === 'string') {
 			try {
 				const parsed = JSON.parse(answer.references);
 				refsArray = Array.isArray(parsed) ? parsed : [parsed];
 			} catch {
-				// If it's not valid JSON, try to extract document IDs from the string
-				const idMatches = answer.references.match(/doc-[a-f0-9]{32}|[a-f0-9]{32}|doc-[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}|[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/gi) || [];
-				refsArray = idMatches.map(id => ({ id, source: id }));
+				return [];
 			}
 		} else if (Array.isArray(answer.references)) {
 			refsArray = answer.references;
 		} else if (typeof answer.references === 'object') {
 			refsArray = [answer.references];
 		}
-		
-		// Extract document IDs from the references
-		const documentIds = new Set<string>();
-		refsArray.forEach(ref => {
-			if (ref && typeof ref === 'object') {
-				// Look for various possible field names that might contain document IDs
-				if (ref.file_path) {
-					// Extract document ID from file path if it contains one
-					const pathMatch = ref.file_path.match(/doc-[a-f0-9]{32}|[a-f0-9]{32}|doc-[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}|[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/i);
-					if (pathMatch) documentIds.add(pathMatch[0]);
-				}
-				if (ref.source_id) {
-					const idMatch = ref.source_id.match(/doc-[a-f0-9]{32}|[a-f0-9]{32}|doc-[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}|[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/i);
-					if (idMatch) documentIds.add(idMatch[0]);
-				}
-				if (ref.reference_id) {
-					const idMatch = ref.reference_id.match(/doc-[a-f0-9]{32}|[a-f0-9]{32}|doc-[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}|[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/i);
-					if (idMatch) documentIds.add(idMatch[0]);
-				}
-				if (ref.id) {
-					const idMatch = ref.id.match(/doc-[a-f0-9]{32}|[a-f0-9]{32}|doc-[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}|[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/i);
-					if (idMatch) documentIds.add(idMatch[0]);
+
+		const uuidRe = /[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/i;
+		const seen = new Set<string>();
+		const result: Array<Reference & { link: string }> = [];
+
+		for (const ref of refsArray) {
+			if (!ref || typeof ref !== 'object') continue;
+
+			let id = '';
+			let filename = '';
+			let type = '';
+			let createdAt = '';
+
+			if (typeof ref.id === 'string' && isValidDocumentId(ref.id)) {
+				// Enriched format returned by backend.
+				id = ref.id.toLowerCase();
+				filename = typeof ref.filename === 'string' ? ref.filename : '';
+				type = typeof ref.type === 'string' ? ref.type : '';
+				createdAt = typeof ref.createdAt === 'string' ? ref.createdAt : '';
+			} else {
+				// Fallback for legacy LightRAG-shaped references.
+				for (const key of ['file_path', 'source_id', 'reference_id', 'document_id', 'id']) {
+					const value = ref[key];
+					if (typeof value !== 'string') continue;
+					const match = value.match(uuidRe);
+					if (match && isValidDocumentId(match[0])) {
+						id = match[0].toLowerCase();
+						break;
+					}
 				}
 			}
-		});
-		
-		// Filter to only include valid document IDs
-		return Array.from(documentIds).filter(isValidDocumentId).map(id => ({
-			id,
-			link: `/data/${id}`
-		}));
+
+			if (!id || seen.has(id)) continue;
+			seen.add(id);
+			result.push({ id, filename, type, createdAt, link: `/data/${id}` });
+		}
+
+		return result;
 	}
 	
 	// Navigate to document page
@@ -143,14 +147,18 @@
 						<div class="mt-6 pt-4 border-t border-border/60">
 							<h3 class="text-sm font-medium text-foreground mb-3">Источники:</h3>
 							<div class="flex flex-wrap gap-2">
-								{#each getDocumentLinks() as {id, link}}
-									<button 
+								{#each getDocumentLinks() as ref}
+									<button
 										type="button"
-										onclick={() => goToDocument(id)}
-										class="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/20 transition-colors"
+										onclick={() => goToDocument(ref.id)}
+										class="inline-flex max-w-full items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary transition-colors hover:bg-primary/20"
+										title={ref.filename || ref.id}
 									>
-										<FileTextIcon class="size-3.5" />
-										Документ {id.substring(0, 8)}...
+										<FileTextIcon class="size-3.5 shrink-0" />
+										<span class="truncate">{ref.filename || `Документ ${ref.id.substring(0, 8)}...`}</span>
+										{#if ref.type}
+											<span class="shrink-0 opacity-70">· {ref.type}</span>
+										{/if}
 									</button>
 								{/each}
 							</div>

@@ -1,0 +1,7 @@
+.env
+.venv
+inputs
+rag_storage
+logs
+*.log
+__pycache__

@@ -15,9 +15,13 @@ services:
       context: backend
     env_file:
       - .env
+    environment:
+      LIGHTRAG_SERVICE_URL: http://lightrag:9621
     restart: unless-stopped
     depends_on:
       db:
+        condition: service_healthy
+      lightrag:
         condition: service_healthy
 
   frontend:
@@ -63,7 +67,39 @@ services:
       start_period: 10s
     restart: unless-stopped
 
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama_data:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    restart: unless-stopped
+
+  ollama-init:
+    image: ollama/ollama:latest
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - ollama pull qwen3:4b-instruct && ollama pull bge-m3
+    depends_on:
+      ollama:
+        condition: service_healthy
+    restart: "no"
+
   lightrag:
+    image: nnkl-lightrag:local
     build:
       context: lightrag
     env_file:
@@ -78,6 +114,7 @@ services:
       LLM_BINDING_HOST: ${LIGHTRAG_LLM_BINDING_HOST}
       LLM_BINDING_API_KEY: ${LIGHTRAG_LLM_BINDING_API_KEY}
       LLM_MODEL: ${LIGHTRAG_LLM_MODEL}
+      LLM_TIMEOUT: ${LIGHTRAG_LLM_TIMEOUT}
       EMBEDDING_BINDING: ${LIGHTRAG_EMBEDDING_BINDING}
       EMBEDDING_BINDING_HOST: ${LIGHTRAG_EMBEDDING_BINDING_HOST}
       EMBEDDING_BINDING_API_KEY: ${LIGHTRAG_EMBEDDING_BINDING_API_KEY}
@@ -112,10 +149,23 @@ services:
       - ./lightrag/inputs:/app/data/inputs
       - ./lightrag/prompts:/app/data/prompts
       - ./lightrag/rag_storage:/app/data/rag_storage
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9621/health', timeout=3)"
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
     depends_on:
       db:
         condition: service_healthy
+      ollama-init:
+        condition: service_completed_successfully
     restart: unless-stopped
 
 volumes:
   postgres_data:
+  ollama_data:

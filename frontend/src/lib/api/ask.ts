@@ -62,7 +62,7 @@ export async function getQuerySession(
   sessionId: string,
 ): Promise<QuerySessionResponse> {
   const response = await api.get<QuerySessionResponse>(
-    `/api/v1/data/ask/session/${sessionId}`
+    `/api/v1/data/ask/session/${sessionId}`,
   );
   return response.data;
 }
@@ -90,7 +90,9 @@ export async function streamQuestion(
   });
 
   if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: ${(await response.text()).trim()}`);
+    throw new Error(
+      `HTTP ${response.status}: ${(await response.text()).trim()}`,
+    );
   }
 
   const reader = response.body?.getReader();

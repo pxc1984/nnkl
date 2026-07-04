@@ -127,7 +127,11 @@ export function formatSessionTime(value: string): string {
 }
 
 function getCalendarDayDiff(from: Date, to: Date): number {
-  const fromDate = new Date(from.getFullYear(), from.getMonth(), from.getDate());
+  const fromDate = new Date(
+    from.getFullYear(),
+    from.getMonth(),
+    from.getDate(),
+  );
   const toDate = new Date(to.getFullYear(), to.getMonth(), to.getDate());
   return Math.round((toDate.getTime() - fromDate.getTime()) / 86400000);
 }

@@ -3,15 +3,10 @@
 	import { page } from "$app/state";
 	import { getApiErrorMessage } from "$lib/api/auth";
 	import { getQuerySession, type QuerySessionResponse } from "$lib/api/ask";
-	import {
-		formatSessionTime,
-		setQuerySessions,
-		type SidebarQuerySession,
-	} from "$lib/ask/query-sessions";
+	import { formatSessionTime, type SidebarQuerySession } from "$lib/ask/query-sessions";
 	import { Button } from "$lib/components/ui/button/index.js";
-	import * as Card from "$lib/components/ui/card/index.js";
 	import { Skeleton } from "$lib/components/ui/skeleton/index.js";
-	import { ArrowLeftIcon, FileTextIcon } from "@lucide/svelte";
+	import { ArrowLeftIcon } from "@lucide/svelte";
 	import { goto } from "$app/navigation";
 	import { resolve } from "$app/paths";
 

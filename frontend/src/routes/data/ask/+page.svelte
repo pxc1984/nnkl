@@ -100,8 +100,9 @@
 				createdAt = typeof ref.createdAt === 'string' ? ref.createdAt : '';
 			} else {
 				// Fallback for legacy LightRAG-shaped references.
+				const legacyRef = ref as Record<string, unknown>;
 				for (const key of ['file_path', 'source_id', 'reference_id', 'document_id', 'id']) {
-					const value = ref[key];
+					const value = legacyRef[key];
 					if (typeof value !== 'string') continue;
 					const match = value.match(uuidRe);
 					if (match && isValidDocumentId(match[0])) {

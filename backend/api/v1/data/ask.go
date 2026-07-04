@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"regexp"
 	"sort"
@@ -48,7 +49,13 @@ func (a *DataAPI) ask(c *gin.Context) {
 		return
 	}
 
-	resp, err := a.lightrag.Query(c.Request.Context(), req.Query, req.Mode)
+	// Усиливаем запрос числовыми ограничениями, чтобы LLM учитывал их при поиске источников.
+	enhancedQuery := enhanceQueryWithNumericConstraints(req.Query)
+	if enhancedQuery != req.Query {
+		slog.Info("enhanced query with numeric constraints", "original", req.Query, "enhanced", enhancedQuery)
+	}
+
+	resp, err := a.lightrag.Query(c.Request.Context(), enhancedQuery, req.Mode)
 	if err != nil {
 		api.RespondError(c, http.StatusServiceUnavailable, "failed to query knowledge base: "+err.Error(), "service_unavailable")
 		return

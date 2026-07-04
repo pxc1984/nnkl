@@ -24,9 +24,13 @@
 	let entries = $state<UploadEntry[]>([]);
 	let inputRef: HTMLInputElement;
 	let dragCounter = $state(0);
+	let isPreparingFiles = $state(false);
+	let filePreparationProgress = $state(0);
+	let filePreparationLabel = $state("");
 	let isUploading = $state(false);
 	let uploadError = $state("");
 	let isDragging = $derived(dragCounter > 0);
+	let isBusy = $derived(isPreparingFiles || isUploading);
 	let fileItems = $derived(entries.map((entry) => entry.name));
 	let fileBadges = $derived(entries.map((entry) => getFileBadges(entry)));
 	let fileProgresses = $derived(entries.map((entry) => (entry.showProgress ? entry.progress : undefined)));
@@ -62,26 +66,90 @@
 		return SUPPORTED_EXTENSIONS.some((ext) => lower.endsWith(ext));
 	}
 
-	async function addFiles(fileList: FileList | File[]) {
-		const newEntries: UploadEntry[] = [];
+	function setFilePreparationState(progress: number, label: string): void {
+		filePreparationProgress = Math.max(0, Math.min(100, Math.round(progress)));
+		filePreparationLabel = label;
+	}
 
-		for (const file of Array.from(fileList)) {
-			if (file.name.toLowerCase().endsWith(".zip")) {
-				const extracted = await extractZip(file);
-				for (const f of extracted) {
-					newEntries.push({ name: f.name, size: f.size, file: f, progress: 0, status: "idle", showProgress: false, errorMessage: "", startedAt: null, finishedAt: null });
-				}
-			} else if (isSupported(file.name)) {
-				newEntries.push({ name: file.name, size: file.size, file, progress: 0, status: "idle", showProgress: false, errorMessage: "", startedAt: null, finishedAt: null });
-			}
+	function openFileDialog(): void {
+		if (isBusy) {
+			return;
 		}
 
-		entries = [...entries, ...newEntries];
+		inputRef?.click();
+	}
 
-		if (newEntries.length > 0) {
-			queueMicrotask(() => {
-				void handleUpload();
-			});
+	function readFileAsArrayBuffer(file: File, onProgress: (progress: number) => void): Promise<ArrayBuffer> {
+		return new Promise((resolve, reject) => {
+			const reader = new FileReader();
+
+			reader.onprogress = (event) => {
+				if (event.lengthComputable && event.total > 0) {
+					onProgress(event.loaded / event.total);
+				}
+			};
+
+			reader.onload = () => {
+				onProgress(1);
+				resolve(reader.result as ArrayBuffer);
+			};
+
+			reader.onerror = () => {
+				reject(reader.error ?? new Error(`Не удалось прочитать файл ${file.name}.`));
+			};
+
+			reader.readAsArrayBuffer(file);
+		});
+	}
+
+	async function addFiles(fileList: FileList | File[]) {
+		if (isBusy) {
+			return;
+		}
+
+		const files = Array.from(fileList);
+		if (files.length === 0) {
+			return;
+		}
+
+		const newEntries: UploadEntry[] = [];
+		const totalBytes = Math.max(files.reduce((sum, file) => sum + file.size, 0), files.length);
+		let processedBytes = 0;
+
+		isPreparingFiles = true;
+		setFilePreparationState(0, "Готовим файлы...");
+
+		try {
+			for (const file of files) {
+				const baseProcessedBytes = processedBytes;
+				const updateOverallProgress = (fileProgress: number, label: string) => {
+					const progress = ((baseProcessedBytes + file.size * fileProgress) / totalBytes) * 100;
+					setFilePreparationState(progress, label);
+				};
+
+				if (file.name.toLowerCase().endsWith(".zip")) {
+					const extracted = await extractZip(file, updateOverallProgress);
+					for (const f of extracted) {
+						newEntries.push({ name: f.name, size: f.size, file: f, progress: 0, status: "idle", showProgress: false, errorMessage: "", startedAt: null, finishedAt: null });
+					}
+				} else if (isSupported(file.name)) {
+					updateOverallProgress(1, `Подготавливаем ${file.name}`);
+					newEntries.push({ name: file.name, size: file.size, file, progress: 0, status: "idle", showProgress: false, errorMessage: "", startedAt: null, finishedAt: null });
+				}
+
+				processedBytes += file.size;
+			}
+
+			entries = [...entries, ...newEntries];
+
+			if (newEntries.length > 0) {
+				queueMicrotask(() => {
+					void handleUpload();
+				});
+			}
+		} finally {
+			isPreparingFiles = false;
+			setFilePreparationState(0, "");
 		}
 	}
 
@@ -89,28 +157,35 @@
 		entries = entries.map((entry, entryIndex) => (entryIndex === index ? updater(entry) : entry));
 	}
 
-	async function extractZip(zipFile: File): Promise<File[]> {
+	async function extractZip(zipFile: File, onProgress: (progress: number, label: string) => void): Promise<File[]> {
 		const zip = new JSZip();
-		const data = await zip.loadAsync(zipFile);
-		const results: File[] = [];
-		const tasks: Promise<void>[] = [];
-
-		data.forEach((relativePath, entry) => {
-			if (!entry.dir && isSupported(relativePath)) {
-				tasks.push(
-					entry.async("blob").then((blob) => {
-						results.push(new File([blob], relativePath));
-					}),
-				);
-			}
+		const zipBuffer = await readFileAsArrayBuffer(zipFile, (progress) => {
+			onProgress(progress * 0.8, `Читаем архив ${zipFile.name}`);
 		});
+		onProgress(0.82, `Открываем архив ${zipFile.name}`);
+		const data = await zip.loadAsync(zipBuffer);
+		const results: File[] = [];
+		const zipEntries = data.filter((relativePath, entry) => !entry.dir && isSupported(relativePath));
+		const totalEntries = Math.max(zipEntries.length, 1);
 
-		await Promise.all(tasks);
+		for (const [index, entry] of zipEntries.entries()) {
+			const fileName = entry.name.split('/').pop() || entry.name;
+			const blob = await entry.async("blob", (metadata) => {
+				const extractionProgress = (index + metadata.percent / 100) / totalEntries;
+				onProgress(0.8 + extractionProgress * 0.2, `Распаковываем ${fileName}`);
+			});
+			results.push(new File([blob], entry.name));
+		}
+
+		onProgress(1, `Подготовили ${zipFile.name}`);
 		return results;
 	}
 
 	function handleDragEnter(e: DragEvent) {
 		e.preventDefault();
+		if (isBusy) {
+			return;
+		}
 		dragCounter++;
 	}
 
@@ -126,17 +201,24 @@
 	function handleDrop(e: DragEvent) {
 		e.preventDefault();
 		dragCounter = 0;
+		if (isBusy) {
+			return;
+		}
+
 		if (e.dataTransfer?.files) {
-			addFiles(e.dataTransfer.files);
+			void addFiles(e.dataTransfer.files);
 		}
 	}
 
-	function handleInputChange(e: Event) {
+	async function handleInputChange(e: Event) {
 		const input = e.currentTarget as HTMLInputElement;
-		if (input.files) {
-			addFiles(input.files);
+		try {
+			if (input.files) {
+				await addFiles(input.files);
+			}
+		} finally {
+			input.value = "";
 		}
-		input.value = "";
 	}
 
 	function removeFile(index: number) {
@@ -253,7 +335,7 @@
 	}
 
 	async function handleUpload(): Promise<void> {
-		if (entries.length === 0 || isUploading) {
+		if (entries.length === 0 || isBusy) {
 			return;
 		}
 
@@ -305,22 +387,34 @@
 		type="file"
 		multiple
 		class="sr-only"
+		disabled={isBusy}
 		onchange={handleInputChange}
 	/>
 
 	{#if entries.length === 0}
 		<div
-			class="flex flex-1 cursor-pointer items-center justify-center px-4"
-			onclick={() => inputRef?.click()}
+			class="flex flex-1 items-center justify-center px-4 {isBusy ? 'cursor-default' : 'cursor-pointer'}"
+			onclick={openFileDialog}
 			role="button"
 			tabindex="0"
-			onkeydown={(e) => e.key === 'Enter' && inputRef?.click()}
+			aria-disabled={isBusy}
+			onkeydown={(e) => e.key === 'Enter' && openFileDialog()}
 		>
-			<div class="text-muted-foreground flex flex-col items-center gap-4 text-center">
-				<UploadIcon class="size-16 opacity-40" />
-				<p class="text-lg">Нажмите чтобы выбрать файлы или перетащите их сюда</p>
-				<p class="text-sm">PDF, DOCX, PPTX, а также ZIP-архивы</p>
-			</div>
+			{#if isPreparingFiles}
+				<div class="flex w-full max-w-md flex-col gap-4 text-center">
+					<p class="text-lg">{filePreparationLabel}</p>
+					<div class="h-2 overflow-hidden rounded-full bg-white/10" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={filePreparationProgress} aria-label="Подготовка файлов">
+						<div class="bg-primary h-full rounded-full transition-[width]" style:width={`${filePreparationProgress}%`}></div>
+					</div>
+					<p class="text-muted-foreground text-sm">{filePreparationProgress}%</p>
+				</div>
+			{:else}
+				<div class="text-muted-foreground flex flex-col items-center gap-4 text-center">
+					<UploadIcon class="size-16 opacity-40" />
+					<p class="text-lg">Нажмите чтобы выбрать файлы или перетащите их сюда</p>
+					<p class="text-sm">PDF, DOCX, PPTX, а также ZIP-архивы</p>
+				</div>
+			{/if}
 		</div>
 	{:else}
 		<div class="flex min-h-0 flex-1 flex-col">

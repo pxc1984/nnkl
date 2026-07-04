@@ -4,8 +4,8 @@
 	import AnimatedList from "$lib/components/ui/AnimatedList.svelte";
 	import { getApiErrorMessage } from "$lib/api/auth";
 	import { uploadKnowledgeObjects } from "$lib/api/data";
-	import UploadIcon from "@lucide/svelte/icons/upload";
 	import { formatBytes } from "$lib/data/utils";
+    import { UploadIcon } from "@lucide/svelte";
 
 	type UploadStatus = "idle" | "uploading" | "success" | "error";
 
@@ -41,6 +41,8 @@
 	let now = $state(Date.now());
 	let ticker: ReturnType<typeof setInterval> | null = null;
 	const SUPPORTED_EXTENSIONS = [".pdf", ".docx", ".pptx"];
+	const MAX_BROWSER_ZIP_SIZE_BYTES = 5 * 1024 * 1024 * 1024;
+	const MAX_BROWSER_ZIP_SIZE_LABEL = "5 ГБ";
 
 	function startTicker() {
 		stopTicker();
@@ -64,6 +66,10 @@
 	function isSupported(name: string): boolean {
 		const lower = name.toLowerCase();
 		return SUPPORTED_EXTENSIONS.some((ext) => lower.endsWith(ext));
+	}
+
+	function isZipTooLarge(file: File): boolean {
+		return file.name.toLowerCase().endsWith(".zip") && file.size > MAX_BROWSER_ZIP_SIZE_BYTES;
 	}
 
 	function setFilePreparationState(progress: number, label: string): void {
@@ -107,20 +113,35 @@
 			return;
 		}
 
+		uploadError = "";
+
 		const files = Array.from(fileList);
 		if (files.length === 0) {
 			return;
 		}
 
+		const acceptedFiles = files.filter((file) => {
+			if (!isZipTooLarge(file)) {
+				return true;
+			}
+
+			uploadError = `ZIP-архивы больше ${MAX_BROWSER_ZIP_SIZE_LABEL} пока не поддерживаются в браузере.`;
+			return false;
+		});
+
+		if (acceptedFiles.length === 0) {
+			return;
+		}
+
 		const newEntries: UploadEntry[] = [];
-		const totalBytes = Math.max(files.reduce((sum, file) => sum + file.size, 0), files.length);
+		const totalBytes = Math.max(acceptedFiles.reduce((sum, file) => sum + file.size, 0), acceptedFiles.length);
 		let processedBytes = 0;
 
 		isPreparingFiles = true;
 		setFilePreparationState(0, "Готовим файлы...");
 
 		try {
-			for (const file of files) {
+			for (const file of acceptedFiles) {
 				const baseProcessedBytes = processedBytes;
 				const updateOverallProgress = (fileProgress: number, label: string) => {
 					const progress = ((baseProcessedBytes + file.size * fileProgress) / totalBytes) * 100;
@@ -390,6 +411,12 @@
 		disabled={isBusy}
 		onchange={handleInputChange}
 	/>
+
+	{#if uploadError}
+		<div class="text-destructive bg-destructive/10 rounded-2xl border border-destructive/20 px-4 py-3 text-sm">
+			{uploadError}
+		</div>
+	{/if}
 
 	{#if entries.length === 0}
 		<div

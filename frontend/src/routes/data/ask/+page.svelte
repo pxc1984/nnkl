@@ -48,7 +48,7 @@
 		</div>
 
 		<div class="bg-card/90 w-full rounded-[2rem] border border-border/60 shadow-[0_24px_80px_-32px_rgba(0,0,0,0.45)] backdrop-blur">
-			<div class="border-border/60 bg-background/70 flex min-h-36 flex-col rounded-[1.5rem] border px-4 py-4 md:px-5">
+			<div class="border-border/60 bg-background/70 flex min-h-36 flex-col rounded-[1.5rem] border px-4 py-5 md:px-6 md:py-6">
 				<div class="mb-6">
 					<textarea
 						bind:value={prompt}
@@ -59,8 +59,8 @@
 					></textarea>
 				</div>
 
-				<div class="mt-auto flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-					<div class="flex flex-wrap gap-2">
+				<div class="mt-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between md:gap-6">
+					<div class="flex flex-wrap gap-3">
 						<button
 							type="button"
 							class={useDomesticSources
@@ -73,7 +73,7 @@
 						</button>
 					</div>
 
-					<div class="flex items-center justify-end gap-2">
+					<div class="flex items-center justify-end gap-3">
 						<Button
 							type="button"
 							size="icon"

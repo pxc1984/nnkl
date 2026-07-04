@@ -59,5 +59,6 @@ func RegisterDataRoutes(router gin.IRouter) {
 	protected.POST("", a.upload)
 	protected.POST("/ask", a.ask)
 	protected.POST("/ask/stream", a.askStream)
+	protected.POST("/graph", a.graph)
 	registerObjectRoutes(protected, a)
 }

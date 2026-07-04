@@ -2,6 +2,7 @@ import axios, { type AxiosProgressEvent } from "axios";
 
 import { api } from "$lib/api/client";
 import { DEFAULT_DATA_PAGE_SIZE } from "$lib/data/utils";
+import type { GraphData, GraphNodeType } from "$lib/data/graph";
 import type {
   DataListParams,
   DataTagList,
@@ -75,6 +76,60 @@ export async function listKnowledgeObjects(
 export async function listDataTags(): Promise<DataTagList> {
   const response = await api.get<DataTagList>("/api/v1/tags");
   return response.data;
+}
+
+type GraphBackendResponse = {
+  nodes: Array<{
+    id: string;
+    label: string;
+    type: string;
+    description?: string;
+  }>;
+  edges: Array<{
+    source: string;
+    target: string;
+    label: string;
+    description?: string;
+    weight?: number;
+  }>;
+  mode: string;
+};
+
+export async function queryKnowledgeGraph(
+  query: string,
+  mode = "hybrid",
+): Promise<GraphData> {
+  const response = await api.post<GraphBackendResponse>("/api/v1/data/graph", {
+    query,
+    mode,
+  });
+
+  const allowedTypes = new Set<GraphNodeType>([
+    "Material",
+    "Process",
+    "Equipment",
+    "Property",
+    "Experiment",
+    "Publication",
+    "Expert",
+    "Facility",
+    "Unknown",
+  ]);
+
+  return {
+    nodes: response.data.nodes.map((node) => ({
+      id: node.id,
+      label: node.label,
+      type: (allowedTypes.has(node.type as GraphNodeType)
+        ? node.type
+        : "Unknown") as GraphNodeType,
+    })),
+    edges: response.data.edges.map((edge) => ({
+      source: edge.source,
+      target: edge.target,
+      label: edge.label,
+    })),
+  };
 }
 
 export async function uploadKnowledgeObjects(

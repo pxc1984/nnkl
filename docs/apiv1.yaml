@@ -189,19 +189,22 @@ paths:
         name: query
         schema:
           type: string
-        description: Поисковая строка
+        description: Поиск по названию файла
       - in: query
         name: type
         schema:
           type: string
         description: Фильтр по типу файла
       - in: query
-        name: tags
+        name: status
         schema:
-          type: array
-          items:
-            type: string
-        description: Фильтр по тегам
+          type: string
+          enum:
+          - pending
+          - processing
+          - ready
+          - failed
+        description: Фильтр по статусу обработки
       responses:
         '200':
           description: Страница со списком объектов

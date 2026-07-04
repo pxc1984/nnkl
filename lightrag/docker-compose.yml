@@ -1,32 +1,4 @@
 services:
-  ollama:
-    image: ollama/ollama:latest
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "ollama", "list"]
-      interval: 15s
-      timeout: 10s
-      retries: 10
-      start_period: 30s
-
-  ollama-init:
-    image: ollama/ollama:latest
-    environment:
-      - OLLAMA_HOST=http://ollama:11434
-    depends_on:
-      ollama:
-        condition: service_healthy
-    entrypoint: ["/bin/sh", "-c"]
-    command:
-      - |
-        ollama pull qwen3:4b-instruct
-        ollama pull bge-m3
-    restart: "no"
-
   lightrag:
     build: .
     ports:
@@ -35,15 +7,7 @@ services:
       - .env
     environment:
       - INPUT_DIR=/app/inputs
-      - LLM_BINDING_HOST=http://ollama:11434
-      - EMBEDDING_BINDING_HOST=http://ollama:11434
     volumes:
       - ./inputs:/app/inputs
       - ./rag_storage:/app/rag_storage
-    depends_on:
-      ollama-init:
-        condition: service_completed_successfully
     restart: unless-stopped
-
-volumes:
-  ollama_data:

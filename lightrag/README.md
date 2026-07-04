@@ -1,115 +1,85 @@
 # LightRAG + OCR
 
-Локальный RAG для вопросов по PDF-документам. PDF сначала конвертируются в LaTeX через OCR-сервис (Docling), затем индексируются в LightRAG.
+RAG для вопросов по PDF-документам. OCR преобразует PDF в LaTeX, LightRAG индексирует текст в PostgreSQL, а LLM и embeddings вызываются через внешние API.
 
 ## Архитектура
 
-```
-PDF (ocr/data/pdfs)  →  OCR API :8000  →  .tex (lightrag/inputs)
-                                              ↓
-                                    LightRAG :9621  →  граф + векторы
-                                              ↓
-                              Ollama (qwen3 + bge-m3)  →  ответы на вопросы
+```text
+PDF -> OCR API :8000 -> .tex -> LightRAG :9621 -> PostgreSQL
+                                  |              |
+                                  +-> Cerebras --+-> ответы
+                                  +-> Jina AI ---+-> embeddings
 ```
 
-## Быстрый старт (Docker)
+GPU не требуется. В стандартной конфигурации используются Cerebras `gpt-oss-120b` и Jina AI `jina-embeddings-v3`.
 
-### 1. Запустить OCR
+## Запуск в общем Docker Compose
+
+Из корня проекта:
 
 ```powershell
-cd ocr
+Copy-Item .env.example .env   # если .env ещё нет
+# Заполните LIGHTRAG_LLM_BINDING_API_KEY и LIGHTRAG_EMBEDDING_BINDING_API_KEY
 docker compose up -d --build
 ```
 
-Положите PDF в `ocr/data/pdfs/`.
+Web UI: <http://127.0.0.1:9621>
 
-### 2. Запустить LightRAG + Ollama
+## Отдельный запуск LightRAG
 
 ```powershell
 cd lightrag
 Copy-Item .env.docker.example .env   # если .env ещё нет
+# Заполните LLM_BINDING_API_KEY и EMBEDDING_BINDING_API_KEY
 docker compose up -d --build
 ```
 
-Первый запуск скачает модели Ollama (~4 ГБ). Web UI: <http://127.0.0.1:9621>
+## Индексация через OCR
 
-### 3. Конвертировать PDF и проиндексировать
-
-**Вариант A** — полный пайплайн (PDF → LaTeX → LightRAG):
+Полный пайплайн PDF -> LaTeX -> LightRAG:
 
 ```powershell
 cd lightrag
-# Положите PDF в documents/ или укажите -SourceDir
 powershell -ExecutionPolicy Bypass -File .\ingest-via-ocr.ps1
 ```
 
-**Вариант B** — импорт уже готовых .tex из OCR:
+Импорт готовых результатов OCR:
 
 ```powershell
-cd lightrag
 powershell -ExecutionPolicy Bypass -File .\import-ocr-results.ps1 -TriggerScan
 ```
 
-Скрипт дедуплицирует одинаковые результаты и кладёт уникальные `.tex` в `inputs/`.
-
-### 4. Задать вопрос
+## Запрос
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\query.ps1 -Query "Что такое фракционирование изотопов углерода?"
 ```
 
-Или через Web UI: <http://127.0.0.1:9621>
-
-## Локальный запуск (без Docker для LightRAG)
+## Локальный запуск без Docker
 
 ```powershell
 cd lightrag
-powershell -ExecutionPolicy Bypass -File .\setup.ps1   # Ollama + venv
-powershell -ExecutionPolicy Bypass -File .\start.ps1     # сервер
-# в другом окне:
-powershell -ExecutionPolicy Bypass -File .\import-ocr-results.ps1 -TriggerScan
+powershell -ExecutionPolicy Bypass -File .\setup.ps1
+# Заполните ключи в .env
+powershell -ExecutionPolicy Bypass -File .\start.ps1
 ```
 
-## Модели
+## Переменные моделей
 
-- `qwen3:4b-instruct` — извлечение сущностей, связей и ответы
-- `bge-m3` — мультиязычные embeddings (1024 dim)
-
-## Скрипты
-
-| Скрипт | Назначение |
-|--------|------------|
-| `ingest-via-ocr.ps1` | PDF → OCR API → `inputs/*.tex` → `/documents/scan` |
-| `import-ocr-results.ps1` | Готовые `.tex` из `ocr/data/results` → `inputs/` |
-| `query.ps1` | Вопрос к проиндексированной базе |
-| `prepare-input.ps1` | Прямое копирование PDF (без OCR) |
-| `index.ps1` | Только `/documents/scan` |
+| Переменная | Значение по умолчанию |
+|---|---|
+| `LLM_BINDING` | `openai` |
+| `LLM_BINDING_HOST` | `https://api.cerebras.ai/v1` |
+| `LLM_MODEL` | `gpt-oss-120b` |
+| `EMBEDDING_BINDING` | `jina` |
+| `EMBEDDING_BINDING_HOST` | `https://api.jina.ai/v1/embeddings` |
+| `EMBEDDING_MODEL` | `jina-embeddings-v3` |
+| `EMBEDDING_DIM` | `1024` |
 
 ## Важные детали
 
-- LightRAG 1.5.4 поддерживает `.tex` напрямую — отдельная конвертация в Markdown не нужна.
-- `import-ocr-results.ps1` убирает дубликаты по SHA256 (один PDF → один `.tex`).
-- `ocr_mapping.json` хранится в корне `lightrag/`, не в `inputs/`.
-- Индекс привязан к embedding-модели. После смены модели удалите `rag_storage/` и переиндексируйте.
-- При таймаутах LLM увеличьте `LLM_TIMEOUT` в `.env` (по умолчанию 600 с).
-- Первый OCR-запуск воркера загружает модели Docling (~2–5 мин).
-
-## Переменные окружения (.env)
-
-| Переменная | По умолчанию | Описание |
-|------------|--------------|----------|
-| `LLM_BINDING_HOST` | `http://ollama:11434` | Ollama в Docker |
-| `LLM_MODEL` | `qwen3:4b-instruct` | LLM |
-| `EMBEDDING_MODEL` | `bge-m3` | Embeddings |
-| `LLM_TIMEOUT` | `600` | Таймаут LLM (сек) |
-| `OLLAMA_LLM_NUM_CTX` | `4096` | Контекст LLM |
-| `SUMMARY_LANGUAGE` | `Russian` | Язык ответов |
-
-## Сброс индекса
-
-```powershell
-cd lightrag
-Remove-Item -Recurse -Force rag_storage\*
-docker compose restart lightrag
-powershell -ExecutionPolicy Bypass -File .\import-ocr-results.ps1 -TriggerScan
-```
+- LightRAG 1.5.4 принимает `.tex` напрямую.
+- `import-ocr-results.ps1` удаляет дубликаты по SHA256.
+- Индекс зависит от embedding-модели и её размерности.
+- После смены embedding-провайдера документы необходимо переиндексировать.
+- Первый OCR-запуск может загружать модели распознавания несколько минут; это отдельная CPU-нагрузка и не связано с LLM.

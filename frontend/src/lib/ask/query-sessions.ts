@@ -89,7 +89,7 @@ function stripMarkdown(value: string): string {
     .trim();
 }
 
-function formatSessionTime(value: string): string {
+export function formatSessionTime(value: string): string {
   const createdAt = new Date(value);
   if (Number.isNaN(createdAt.getTime())) {
     return "Ранее";
@@ -111,7 +111,7 @@ function formatSessionTime(value: string): string {
     return `${diffHours} ч назад`;
   }
 
-  const diffDays = Math.floor(diffHours / 24);
+  const diffDays = getCalendarDayDiff(createdAt, new Date());
   if (diffDays === 1) {
     return "Вчера";
   }
@@ -124,4 +124,10 @@ function formatSessionTime(value: string): string {
     day: "2-digit",
     month: "2-digit",
   });
+}
+
+function getCalendarDayDiff(from: Date, to: Date): number {
+  const fromDate = new Date(from.getFullYear(), from.getMonth(), from.getDate());
+  const toDate = new Date(to.getFullYear(), to.getMonth(), to.getDate());
+  return Math.round((toDate.getTime() - fromDate.getTime()) / 86400000);
 }

@@ -3,7 +3,11 @@
 	import { page } from "$app/state";
 	import { getApiErrorMessage } from "$lib/api/auth";
 	import { getQuerySession, type QuerySessionResponse } from "$lib/api/ask";
-	import { setQuerySessions, type SidebarQuerySession } from "$lib/ask/query-sessions";
+	import {
+		formatSessionTime,
+		setQuerySessions,
+		type SidebarQuerySession,
+	} from "$lib/ask/query-sessions";
 	import { Button } from "$lib/components/ui/button/index.js";
 	import * as Card from "$lib/components/ui/card/index.js";
 	import { Skeleton } from "$lib/components/ui/skeleton/index.js";
@@ -42,7 +46,7 @@
 				id: sessionData.id,
 				name: sessionData.query,
 				preview: sessionData.answer.substring(0, 120) + (sessionData.answer.length > 120 ? '...' : ''),
-				time: formatDate(sessionData.createdAt),
+				time: formatSessionTime(sessionData.createdAt),
 				query: sessionData.query,
 				answer: sessionData.answer,
 				mode: sessionData.mode,
@@ -52,27 +56,6 @@
 			errorMessage = getApiErrorMessage(error, "Не удалось загрузить сессию.");
 		} finally {
 			isLoading = false;
-		}
-	}
-
-	function formatDate(dateString: string): string {
-		const date = new Date(dateString);
-		const now = new Date();
-		const diffMs = now.getTime() - date.getTime();
-		const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-		if (diffDays === 0) {
-			return "Сегодня";
-		} else if (diffDays === 1) {
-			return "Вчера";
-		} else if (diffDays < 7) {
-			return `${diffDays} дн. назад`;
-		} else {
-			return date.toLocaleDateString("ru-RU", {
-				day: "2-digit",
-				month: "2-digit",
-				year: "numeric"
-			});
 		}
 	}
 

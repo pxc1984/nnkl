@@ -13,6 +13,12 @@ export type AskResponse = {
   sessionId: string;
 };
 
+const NO_CONTEXT_MARKER = "[no-context]";
+
+export function isNoContextAnswer(answer: string): boolean {
+  return answer.trim().includes(NO_CONTEXT_MARKER);
+}
+
 export async function askQuestion(
   query: string,
   mode: AskRequest["mode"] = "naive",

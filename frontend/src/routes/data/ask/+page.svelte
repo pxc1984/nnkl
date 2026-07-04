@@ -1,14 +1,27 @@
 <script lang="ts">
-    import {prependQuerySession} from "$lib/ask/query-sessions";
+    import {prependQuerySession, querySessions} from "$lib/ask/query-sessions";
     import {Button} from "$lib/components/ui/button/index.js";
     import MarkdownRenderer from "$lib/components/markdown-renderer.svelte";
     import {ArrowUpIcon, GlobeIcon} from "@lucide/svelte";
-    import {askQuestion, type AskResponse} from "$lib/api/ask";
+    import {askQuestion, isNoContextAnswer, type AskResponse} from "$lib/api/ask";
 
     let prompt = $state("");
     let useDomesticSources = $state(false);
     let isLoading = $state(false);
-    let answer = $state<AskResponse | null>(null);
+    let inlineMessage = $state("");
+
+    const activeSession = $derived($querySessions.find((session) => session.active) ?? null);
+    const answer = $derived.by<AskResponse | null>(() => {
+        if (!activeSession) {
+            return null;
+        }
+
+        return {
+            answer: activeSession.answer,
+            mode: activeSession.mode ?? "naive",
+            sessionId: activeSession.id,
+        };
+    });
 
     async function handleSubmit() {
         const query = prompt.trim();
@@ -17,21 +30,27 @@
         }
 
         isLoading = true;
-        answer = null;
+        inlineMessage = "";
 
         try {
             const mode = useDomesticSources ? "local" : "naive";
-            answer = await askQuestion(query, mode);
+            const nextAnswer = await askQuestion(query, mode);
 
-            if (answer.sessionId) {
+            if (isNoContextAnswer(nextAnswer.answer)) {
+                inlineMessage = "Не удалось подобрать контекст для ответа. Попробуйте переформулировать вопрос и спросить снова.";
+                return;
+            }
+
+            if (nextAnswer.sessionId) {
                 prependQuerySession({
-                    id: answer.sessionId,
+                    id: nextAnswer.sessionId,
                     query,
-                    answer: answer.answer,
+                    answer: nextAnswer.answer,
+                    mode: nextAnswer.mode,
                 });
             }
         } catch {
-            answer = null;
+            inlineMessage = "Не удалось получить ответ. Попробуйте спросить снова.";
         } finally {
             isLoading = false;
         }
@@ -51,6 +70,10 @@
             {#if answer}
                 <div class="bg-card/90 rounded-[2rem] border border-border/60 px-5 py-6 shadow-[0_24px_80px_-32px_rgba(0,0,0,0.45)] backdrop-blur md:px-8 md:py-8">
                     <MarkdownRenderer markdown={answer.answer}/>
+                </div>
+            {:else if inlineMessage}
+                <div class="bg-card/90 rounded-[2rem] border border-border/60 px-5 py-6 text-center shadow-[0_24px_80px_-32px_rgba(0,0,0,0.45)] backdrop-blur md:px-8 md:py-8">
+                    <p class="text-muted-foreground text-base leading-7 md:text-lg">{inlineMessage}</p>
                 </div>
             {:else}
                 <div class="flex min-h-full items-start justify-center rounded-[2rem] px-6 py-16 text-center shadow-[0_24px_80px_-32px_rgba(0,0,0,0.35)] backdrop-blur">

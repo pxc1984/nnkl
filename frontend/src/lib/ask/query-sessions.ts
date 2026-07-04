@@ -5,6 +5,9 @@ export type SidebarQuerySession = {
   name: string;
   preview: string;
   time: string;
+  query: string;
+  answer: string;
+  mode?: string;
   active?: boolean;
 };
 
@@ -16,6 +19,7 @@ export function prependQuerySession(session: {
   id: string;
   query: string;
   answer: string;
+  mode?: string;
 }): void {
   querySessions.update((items) => {
     const nextItem: SidebarQuerySession = {
@@ -23,6 +27,9 @@ export function prependQuerySession(session: {
       name: truncate(session.query.trim(), 72),
       preview: truncate(stripMarkdown(session.answer), 120),
       time: "Сейчас",
+      query: session.query,
+      answer: session.answer,
+      mode: session.mode,
       active: true,
     };
 
@@ -33,6 +40,15 @@ export function prependQuerySession(session: {
         .map((item) => ({ ...item, active: false })),
     ].slice(0, MAX_QUERY_SESSIONS);
   });
+}
+
+export function activateQuerySession(sessionId: string): void {
+  querySessions.update((items) =>
+    items.map((item) => ({
+      ...item,
+      active: item.id === sessionId,
+    })),
+  );
 }
 
 function truncate(value: string, maxLength: number): string {

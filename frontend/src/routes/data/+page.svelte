@@ -1,9 +1,10 @@
 <script lang="ts">
 	import { browser } from "$app/environment";
 	import { getApiErrorMessage } from "$lib/api/auth";
-	import { listKnowledgeObjects } from "$lib/api/data";
+	import { deleteKnowledgeObject, listKnowledgeObjects } from "$lib/api/data";
+	import DataTableActions from "$lib/components/data/data-table-actions.svelte";
 	import DataStatusBadge from "$lib/components/data/data-status-badge.svelte";
-	import { Button, buttonVariants } from "$lib/components/ui/button/index.js";
+	import { Button } from "$lib/components/ui/button/index.js";
 	import { Skeleton } from "$lib/components/ui/skeleton/index.js";
 	import * as Table from "$lib/components/ui/table/index.js";
 	import {
@@ -32,7 +33,62 @@
 	let errorMessage = $state("");
 	let currentPage = $state(1);
 	let pagination = $state<PaginationState>({ pageIndex: 0, pageSize: PAGE_SIZE });
+	let confirmingDeleteId = $state<string | null>(null);
+	let deletingId = $state<string | null>(null);
 	let requestRun = 0;
+	let deleteConfirmTimeout = $state<number | null>(null);
+
+	function clearDeleteConfirmation(): void {
+		if (deleteConfirmTimeout !== null) {
+			window.clearTimeout(deleteConfirmTimeout);
+			deleteConfirmTimeout = null;
+		}
+
+		confirmingDeleteId = null;
+	}
+
+	function armDeleteConfirmation(id: string): void {
+		clearDeleteConfirmation();
+		confirmingDeleteId = id;
+		deleteConfirmTimeout = window.setTimeout(() => {
+			if (confirmingDeleteId === id) {
+				confirmingDeleteId = null;
+				deleteConfirmTimeout = null;
+			}
+		}, 2000);
+	}
+
+	async function handleDeleteClick(id: string): Promise<void> {
+		if (deletingId !== null) {
+			return;
+		}
+
+		if (confirmingDeleteId !== id) {
+			armDeleteConfirmation(id);
+			return;
+		}
+
+		clearDeleteConfirmation();
+		deletingId = id;
+		errorMessage = "";
+
+		const nextPage = objects.length === 1 && currentPage > 1 ? currentPage - 1 : currentPage;
+
+		try {
+			await deleteKnowledgeObject(id);
+
+			if (nextPage !== currentPage) {
+				currentPage = nextPage;
+				pagination = { ...pagination, pageIndex: nextPage - 1 };
+			} else {
+				await loadData(nextPage);
+			}
+		} catch (error) {
+			errorMessage = getApiErrorMessage(error, "Не удалось удалить материал.");
+		} finally {
+			deletingId = null;
+		}
+	}
 
 	async function loadData(pageNum: number): Promise<void> {
 		const currentRun = ++requestRun;
@@ -69,6 +125,14 @@
 		void loadData(currentPage);
 	});
 
+	$effect(() => {
+		return () => {
+			if (deleteConfirmTimeout !== null) {
+				window.clearTimeout(deleteConfirmTimeout);
+			}
+		};
+	});
+
 	const totalPages = $derived(paginationMeta.totalPages ?? 1);
 	const totalItems = $derived(paginationMeta.total ?? 0);
 
@@ -90,17 +154,6 @@
 		const { date } = getDate();
 		return {
 			render: () => `<span class="text-muted-foreground">${date}</span>`,
-		};
-	});
-
-	const actionSnippet = createRawSnippet<[{ id: string }]>((getId) => {
-		const { id } = getId();
-		const classes = cn(
-			buttonVariants({ variant: "outline", size: "sm" }),
-			"rounded-full",
-		);
-		return {
-			render: () => `<a href="/data/${id}" class="${classes}">Открыть</a>`,
 		};
 	});
 
@@ -128,7 +181,13 @@
 		{
 			id: "actions",
 			header: "",
-			cell: ({ row }) => renderSnippet(actionSnippet, { id: row.original.id }),
+			cell: ({ row }) =>
+				renderComponent(DataTableActions, {
+					id: row.original.id,
+					isDeleteConfirming: confirmingDeleteId === row.original.id,
+					isDeleting: deletingId === row.original.id,
+					onDeleteClick: (id: string) => void handleDeleteClick(id),
+				}),
 		},
 	];
 
@@ -186,7 +245,7 @@
 					{#each table.getHeaderGroups() as headerGroup (headerGroup.id)}
 						<Table.Row>
 							{#each headerGroup.headers as header (header.id)}
-								<Table.Head class={cn("has-[[role=checkbox]]:ps-3", header.column.id === "mimeType" && "hidden md:table-cell w-24", header.column.id === "filename" && "w-full min-w-0", header.column.id === "size" && "w-20", header.column.id === "status" && "w-24", header.column.id === "createdAt" && "w-36", header.column.id === "actions" && "w-24")}>
+								<Table.Head class={cn("has-[[role=checkbox]]:ps-3", header.column.id === "mimeType" && "hidden md:table-cell w-24", header.column.id === "filename" && "w-full min-w-0", header.column.id === "size" && "w-20", header.column.id === "status" && "w-24", header.column.id === "createdAt" && "w-36", header.column.id === "actions" && "w-36")}>
 									{#if !header.isPlaceholder}
 										<FlexRender
 											content={header.column.columnDef.header}

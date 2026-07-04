@@ -10,28 +10,39 @@ import type {
   DataUploadResponse,
   KnowledgeObject,
   KnowledgeObjectDetails,
+  KnowledgeObjectStatus,
   PaginatedKnowledgeObjectList,
 } from "$lib/data/types";
 
 const MAX_UPLOAD_BATCH_BYTES = 9 * 1024 * 1024;
 
 type ListKnowledgeObjectsBackendResponse = {
-  items: Array<{
-    id: string;
-    filename: string;
-    type: string;
-    contentType: string;
-    tags: string[];
-    sizeBytes: number;
-    createdAt: string;
-    updatedAt: string;
-  }>;
+  items: BackendKnowledgeObject[];
   meta: {
     page: number;
     pageSize: number;
     total: number;
     totalPages: number;
   };
+};
+
+type BackendKnowledgeObject = {
+  id: string;
+  filename: string;
+  type?: string;
+  contentType?: string;
+  tags?: string[] | null;
+  sizeBytes?: number;
+  createdAt: string;
+  updatedAt?: string;
+  status?: string;
+  errorMessage?: string | null;
+  metadata?: Record<string, unknown>;
+  title?: string;
+  sha256?: string;
+  hasContent?: boolean;
+  hasResult?: boolean;
+  language?: string | null;
 };
 
 export async function listKnowledgeObjects(
@@ -58,17 +69,7 @@ export async function listKnowledgeObjects(
   };
 
   return {
-    items: response.data.items.map((item) => ({
-      id: item.id,
-      filename: item.filename,
-      originalFilename: item.filename,
-      mimeType: item.contentType,
-      size: item.sizeBytes,
-      status: "ready" as const,
-      createdAt: item.createdAt,
-      updatedAt: item.updatedAt,
-      tags: item.tags,
-    })),
+    items: response.data.items.map(mapKnowledgeObject),
     meta,
   };
 }
@@ -314,17 +315,19 @@ function isPayloadTooLargeError(error: unknown): boolean {
 export async function getKnowledgeObject(
   id: string,
 ): Promise<KnowledgeObjectDetails> {
-  const response = await api.get<KnowledgeObjectDetails>(`/api/v1/data/${id}`);
-  return response.data;
+  const response = await api.get<BackendKnowledgeObjectDetails>(
+    `/api/v1/data/${id}`,
+  );
+  return mapKnowledgeObjectDetails(response.data);
 }
 
 export async function reprocessKnowledgeObject(
   id: string,
 ): Promise<KnowledgeObject> {
-  const response = await api.post<KnowledgeObject>(
+  const response = await api.post<BackendKnowledgeObject>(
     `/api/v1/data/${id}/reprocess`,
   );
-  return response.data;
+  return mapKnowledgeObject(response.data);
 }
 
 export async function deleteKnowledgeObject(id: string): Promise<void> {
@@ -368,4 +371,61 @@ export function isAxiosError(
   error: unknown,
 ): error is ReturnType<typeof axios.isAxiosError> {
   return axios.isAxiosError(error);
+}
+
+type BackendKnowledgeObjectDetails = BackendKnowledgeObject & {
+  content?: string;
+  chunks?: KnowledgeObjectDetails["chunks"];
+};
+
+function mapKnowledgeObject(item: BackendKnowledgeObject): KnowledgeObject {
+  return {
+    id: item.id,
+    filename: item.filename,
+    originalFilename: item.filename,
+    type: item.type,
+    mimeType: item.contentType,
+    contentType: item.contentType,
+    size: item.sizeBytes,
+    sizeBytes: item.sizeBytes,
+    status: normalizeKnowledgeObjectStatus(item.status),
+    errorMessage: item.errorMessage,
+    createdAt: item.createdAt,
+    updatedAt: item.updatedAt,
+    metadata: item.metadata,
+    tags: item.tags ?? [],
+    title: item.title,
+    sha256: item.sha256,
+    hasContent: item.hasContent,
+    hasResult: item.hasResult,
+    language: item.language,
+  };
+}
+
+function mapKnowledgeObjectDetails(
+  item: BackendKnowledgeObjectDetails,
+): KnowledgeObjectDetails {
+  return {
+    ...mapKnowledgeObject(item),
+    content: item.content,
+    chunks: item.chunks,
+  };
+}
+
+function normalizeKnowledgeObjectStatus(
+  status?: string,
+): KnowledgeObjectStatus {
+  switch (status) {
+    case "completed":
+    case "ready":
+      return "ready";
+    case "processing":
+      return "processing";
+    case "failed":
+    case "error":
+      return "failed";
+    case "pending":
+    default:
+      return "pending";
+  }
 }

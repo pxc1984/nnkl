@@ -11,6 +11,7 @@
     type NavItem = {
         title: string;
         url: NavUrl;
+        onSelect?: () => void;
     };
     type NavMainItem = NavItem & {
         // This should be `Component` after @lucide/svelte updates types
@@ -97,6 +98,11 @@
                         title: "Общие",
                         url: "#",
                     },
+                    {
+                        title: "Переключить тему",
+                        url: "#",
+                        onSelect: () => {},
+                    },
                 ],
             },
         ],
@@ -164,6 +170,7 @@
 <script lang="ts">
     import {querySessions} from "$lib/ask/query-sessions";
     import type {UserProfile} from "$lib/auth/types";
+    import {onMount} from "svelte";
     import NavMain from "./nav-main.svelte";
     import NavProjects from "./nav-projects.svelte";
     import NavSecondary from "./nav-secondary.svelte";
@@ -192,6 +199,43 @@
     );
 
     const sidebarQueries = $derived($querySessions.length > 0 ? $querySessions : appSidebarData.queries);
+
+    const THEME_STORAGE_KEY = "theme";
+
+    const applyTheme = (theme: "dark" | "light") => {
+        document.documentElement.classList.toggle("dark", theme === "dark");
+        window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+    };
+
+    const toggleTheme = () => {
+        const nextTheme = document.documentElement.classList.contains("dark") ? "light" : "dark";
+        applyTheme(nextTheme);
+    };
+
+    onMount(() => {
+        const savedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
+        applyTheme(savedTheme === "light" ? "light" : "dark");
+    });
+
+    const navMainItems = $derived.by(() =>
+        appSidebarData.navMain.map((item) => {
+            if (item.title !== "Настройки") {
+                return item;
+            }
+
+            return {
+                ...item,
+                items: item.items?.map((subItem) =>
+                    subItem.title === "Переключить тему"
+                        ? {
+                            ...subItem,
+                            onSelect: toggleTheme,
+                        }
+                        : subItem,
+                ),
+            };
+        }),
+    );
 </script>
 
 <Sidebar.Root bind:ref variant="inset" {...restProps}>
@@ -212,7 +256,7 @@
         </Sidebar.Menu>
     </Sidebar.Header>
     <Sidebar.Content class="overflow-hidden">
-        <NavMain items={appSidebarData.navMain}/>
+        <NavMain items={navMainItems}/>
         <NavProjects queries={sidebarQueries}/>
         <NavSecondary items={appSidebarData.navSecondary} class="mt-auto"/>
     </Sidebar.Content>

@@ -13,6 +13,7 @@
 		items: {
 			title: string;
 			url: NavUrl;
+			onSelect?: () => void;
 			// This should be `Component` after @lucide/svelte updates types
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			icon: any;
@@ -20,6 +21,7 @@
 			items?: {
 				title: string;
 				url: NavUrl;
+				onSelect?: () => void;
 			}[];
 		}[];
 	} = $props();
@@ -66,13 +68,17 @@
 							</Collapsible.Trigger>
 							<Collapsible.Content>
 								<Sidebar.MenuSub class="gap-1">
-									{#each mainItem.items as subItem (subItem.title)}
-										<Sidebar.MenuSubItem>
-										{#if subItem.url === "#"}
-											<Sidebar.MenuSubButton>
-												<span>{subItem.title}</span>
-											</Sidebar.MenuSubButton>
-										{:else if isExternalUrl(subItem.url)}
+								{#each mainItem.items as subItem (subItem.title)}
+									<Sidebar.MenuSubItem>
+									{#if subItem.onSelect}
+										<Sidebar.MenuSubButton onclick={subItem.onSelect}>
+											<span>{subItem.title}</span>
+										</Sidebar.MenuSubButton>
+									{:else if subItem.url === "#"}
+										<Sidebar.MenuSubButton>
+											<span>{subItem.title}</span>
+										</Sidebar.MenuSubButton>
+									{:else if isExternalUrl(subItem.url)}
 											<Sidebar.MenuSubButton href={subItem.url} rel="external">
 												<span>{subItem.title}</span>
 											</Sidebar.MenuSubButton>

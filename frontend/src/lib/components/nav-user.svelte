@@ -6,7 +6,7 @@
     import * as Sidebar from "$lib/components/ui/sidebar/index.js";
 	import { logout } from "$lib/auth/store";
     import {useSidebar} from "$lib/components/ui/sidebar/index.js";
-	import { BadgeCheckIcon, BellIcon, ChevronsUpDownIcon, LogOutIcon } from "@lucide/svelte";
+	import { BadgeCheckIcon, ChevronsUpDownIcon, LogOutIcon } from "@lucide/svelte";
 
     let {
         user,
@@ -87,10 +87,6 @@
                     <DropdownMenu.Item onclick={() => goto(resolve("/data/account"))}>
                         <BadgeCheckIcon/>
                         Аккаунт
-                    </DropdownMenu.Item>
-                    <DropdownMenu.Item>
-                        <BellIcon/>
-                        Уведомления
                     </DropdownMenu.Item>
                 </DropdownMenu.Group>
                 <DropdownMenu.Separator/>

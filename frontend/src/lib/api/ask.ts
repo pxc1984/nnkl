@@ -14,6 +14,20 @@ export type AskResponse = {
   references?: any; // Added references field to handle LightRAG response
 };
 
+export type QuerySessionResponse = {
+  id: string;
+  query: string;
+  answer: string;
+  mode: string;
+  createdAt: string;
+};
+
+const NO_CONTEXT_MARKER = "[no-context]";
+
+export function isNoContextAnswer(answer: string): boolean {
+  return answer.trim().includes(NO_CONTEXT_MARKER);
+}
+
 export async function askQuestion(
   query: string,
   mode: AskRequest["mode"] = "naive",
@@ -22,6 +36,18 @@ export async function askQuestion(
     query,
     mode,
   });
+  return response.data;
+}
+
+export async function listQuerySessions(
+  pageSize = 8,
+): Promise<QuerySessionResponse[]> {
+  const response = await api.get<QuerySessionResponse[]>(
+    "/api/v1/data/ask/sessions",
+    {
+      params: { pageSize },
+    },
+  );
   return response.data;
 }
 

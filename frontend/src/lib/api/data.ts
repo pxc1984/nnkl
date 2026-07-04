@@ -327,6 +327,10 @@ export async function reprocessKnowledgeObject(
   return response.data;
 }
 
+export async function deleteKnowledgeObject(id: string): Promise<void> {
+  await api.delete(`/api/v1/data/${id}`);
+}
+
 export async function downloadKnowledgeObject(
   id: string,
 ): Promise<{ blob: Blob; filename?: string }> {

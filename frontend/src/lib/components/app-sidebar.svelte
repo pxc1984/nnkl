@@ -3,7 +3,6 @@
     import BookOpenIcon from "@lucide/svelte/icons/book-open";
     import NetworkIcon from "@lucide/svelte/icons/network";
     import Settings2Icon from "@lucide/svelte/icons/settings-2";
-    import SquareTerminalIcon from "@lucide/svelte/icons/square-terminal";
     import {Database, SearchIcon} from "@lucide/svelte";
 
     type Pathname = ReturnType<AppTypes["Pathname"]>;

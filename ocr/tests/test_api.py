@@ -11,9 +11,9 @@ from fastapi.testclient import TestClient
 from app.db.models import InputBlob, ParseJob
 
 
-def _insert_blob(db_session, sample_pdf: Path, blob_id: str = "blob-1") -> InputBlob:
+def _insert_blob(db_session, sample_pdf: Path, blob_id: str = "00000000-0000-0000-0000-000000000001") -> InputBlob:
     blob = InputBlob(
-        id=blob_id,
+        id=uuid.UUID(blob_id),
         filename=sample_pdf.name,
         content_type="application/pdf",
         content=sample_pdf.read_bytes(),
@@ -32,7 +32,7 @@ def _insert_blob_bytes(
     content: bytes,
 ) -> InputBlob:
     blob = InputBlob(
-        id=blob_id,
+        id=uuid.UUID(blob_id),
         filename=filename,
         content_type=content_type,
         content=content,
@@ -54,7 +54,8 @@ class TestHealthEndpoint:
 class TestParseEndpoint:
     @patch("app.use_cases.parse_document.get_ocr_service")
     def test_parse_persists_result(self, mock_get_ocr_service, client: TestClient, db_session, sample_pdf: Path) -> None:
-        _insert_blob(db_session, sample_pdf)
+        blob_id = str(uuid.uuid4())
+        _insert_blob(db_session, sample_pdf, blob_id=blob_id)
         ocr_service = mock_get_ocr_service.return_value
         ocr_service.convert.return_value = ("parsed content", None)
 
@@ -62,7 +63,7 @@ class TestParseEndpoint:
             "/api/v1/parse",
             json={
                 "document_id": "doc-1",
-                "input_blob_id": "blob-1",
+                "input_blob_id": blob_id,
                 "output_format": "latex",
                 "language": "auto",
             },
@@ -80,11 +81,12 @@ class TestParseEndpoint:
         assert job.result.content_text == "parsed content"
 
     def test_parse_missing_blob_returns_404(self, client: TestClient) -> None:
+        missing_blob_id = str(uuid.uuid4())
         response = client.post(
             "/api/v1/parse",
             json={
                 "document_id": "doc-missing",
-                "input_blob_id": "blob-missing",
+                "input_blob_id": missing_blob_id,
                 "output_format": "latex",
                 "language": "auto",
             },
@@ -97,7 +99,8 @@ class TestStatusAndResultEndpoints:
     @patch("app.use_cases.parse_document.get_ocr_service")
     def test_status_and_result_return_db_content(self, mock_get_ocr_service, client: TestClient, db_session, sample_pdf: Path) -> None:
         document_id = f"doc-{uuid.uuid4()}"
-        _insert_blob(db_session, sample_pdf, blob_id="blob-2")
+        blob_id = str(uuid.uuid4())
+        _insert_blob(db_session, sample_pdf, blob_id=blob_id)
         ocr_service = mock_get_ocr_service.return_value
         ocr_service.convert.return_value = ("# markdown", None)
 
@@ -105,7 +108,7 @@ class TestStatusAndResultEndpoints:
             "/api/v1/parse",
             json={
                 "document_id": document_id,
-                "input_blob_id": "blob-2",
+                "input_blob_id": blob_id,
                 "output_format": "markdown",
                 "language": "en",
             },
@@ -126,9 +129,10 @@ class TestStatusAndResultEndpoints:
 
 class TestNativeOfficeExtraction:
     def test_parse_docx_uses_native_extraction(self, client: TestClient, db_session, sample_docx_bytes: bytes) -> None:
+        blob_id = str(uuid.uuid4())
         _insert_blob_bytes(
             db_session,
-            blob_id="blob-docx",
+            blob_id=blob_id,
             filename="sample.docx",
             content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             content=sample_docx_bytes,
@@ -138,7 +142,7 @@ class TestNativeOfficeExtraction:
             "/api/v1/parse",
             json={
                 "document_id": "doc-docx",
-                "input_blob_id": "blob-docx",
+                "input_blob_id": blob_id,
                 "output_format": "markdown",
                 "language": "auto",
             },
@@ -153,9 +157,10 @@ class TestNativeOfficeExtraction:
         assert "Cell A | Cell B" in content
 
     def test_parse_pptx_uses_native_extraction(self, client: TestClient, db_session, sample_pptx_bytes: bytes) -> None:
+        blob_id = str(uuid.uuid4())
         _insert_blob_bytes(
             db_session,
-            blob_id="blob-pptx",
+            blob_id=blob_id,
             filename="slides.pptx",
             content_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
             content=sample_pptx_bytes,
@@ -165,7 +170,7 @@ class TestNativeOfficeExtraction:
             "/api/v1/parse",
             json={
                 "document_id": "doc-pptx",
-                "input_blob_id": "blob-pptx",
+                "input_blob_id": blob_id,
                 "output_format": "markdown",
                 "language": "auto",
             },

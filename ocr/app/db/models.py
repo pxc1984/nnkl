@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, LargeBinary, String, Text, UniqueConstraint, func
+from sqlalchemy import DateTime, ForeignKey, LargeBinary, String, Text, UniqueConstraint, Uuid, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -15,7 +16,7 @@ class Base(DeclarativeBase):
 class InputBlob(Base):
     __tablename__ = "input_blobs"
 
-    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
     filename: Mapped[str] = mapped_column(String(512))
     content_type: Mapped[str] = mapped_column(String(255), default="application/pdf")
     sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
@@ -31,7 +32,7 @@ class ParseJob(Base):
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     document_id: Mapped[str] = mapped_column(String(255), index=True)
-    input_blob_id: Mapped[str] = mapped_column(ForeignKey("input_blobs.id"), index=True)
+    input_blob_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("input_blobs.id"), index=True)
     status: Mapped[str] = mapped_column(String(32), default="pending")
     output_format: Mapped[str] = mapped_column(String(32))
     language: Mapped[str] = mapped_column(String(32))

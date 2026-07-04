@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from enum import Enum
 from typing import Literal
 
@@ -23,7 +24,7 @@ class ParseRequest(BaseModel):
     """Запрос OCR-парсинга документа, загруженного gateway в shared Postgres."""
 
     document_id: str = Field(..., min_length=1, max_length=255)
-    input_blob_id: str = Field(..., min_length=1, max_length=64)
+    input_blob_id: uuid.UUID
     output_format: OutputFormat = OutputFormat.LATEX
     language: Language = Language.AUTO
 
@@ -46,7 +47,7 @@ class StatusResponse(BaseModel):
     document_id: str
     job_id: str
     status: TaskStatus
-    input_blob_id: str
+    input_blob_id: uuid.UUID
     output_format: OutputFormat
     language: Language
     result_id: str | None = None

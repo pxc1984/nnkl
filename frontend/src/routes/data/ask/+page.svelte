@@ -1,9 +1,41 @@
 <script lang="ts">
 	import { Button } from "$lib/components/ui/button/index.js";
 	import { ArrowUpIcon, GlobeIcon } from "@lucide/svelte";
+	import { askQuestion, type AskResponse } from "$lib/api/ask";
+	import { getApiErrorMessage } from "$lib/api/auth";
 
-	let prompt = "";
-	let useDomesticSources = false;
+	let prompt = $state("");
+	let useDomesticSources = $state(false);
+	let isLoading = $state(false);
+	let answer = $state<AskResponse | null>(null);
+	let errorMessage = $state("");
+
+	async function handleSubmit() {
+		const query = prompt.trim();
+		if (!query || isLoading) {
+			return;
+		}
+
+		isLoading = true;
+		errorMessage = "";
+		answer = null;
+
+		try {
+			const mode = useDomesticSources ? "local" : "hybrid";
+			answer = await askQuestion(query, mode);
+		} catch (error) {
+			errorMessage = getApiErrorMessage(error, "Не удалось получить ответ от базы знаний.");
+		} finally {
+			isLoading = false;
+		}
+	}
+
+	function handleKeyDown(event: KeyboardEvent) {
+		if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+			event.preventDefault();
+			void handleSubmit();
+		}
+	}
 </script>
 
 <main class="flex flex-1 items-center justify-center px-4 pb-10 pt-4 md:px-8">
@@ -20,6 +52,7 @@
 				<div class="mb-6">
 					<textarea
 						bind:value={prompt}
+						onkeydown={handleKeyDown}
 						rows="4"
 						placeholder="Какие способы закачки шахтных вод в глубокие горизонты применялись в России и за рубежом, и каковы их технико-экономические показатели?"
 						class="text-foreground placeholder:text-muted-foreground field-sizing-content min-h-28 w-full resize-none border-0 bg-transparent px-0 py-0 text-base leading-7 shadow-none outline-none focus-visible:border-0 focus-visible:ring-0 md:text-lg"
@@ -41,12 +74,42 @@
 					</div>
 
 					<div class="flex items-center justify-end gap-2">
-						<Button type="button" size="icon" class="rounded-full">
-							<ArrowUpIcon class="size-4" />
+						<Button
+							type="button"
+							size="icon"
+							class="rounded-full"
+							disabled={!prompt.trim() || isLoading}
+							onclick={handleSubmit}
+						>
+							{#if isLoading}
+								<span class="size-4 animate-spin rounded-full border-2 border-current border-t-transparent"></span>
+							{:else}
+								<ArrowUpIcon class="size-4" />
+							{/if}
 						</Button>
 					</div>
 				</div>
 			</div>
 		</div>
+
+		{#if errorMessage}
+			<div class="w-full rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+				{errorMessage}
+			</div>
+		{/if}
+
+		{#if answer}
+			<div class="w-full rounded-[2rem] border border-border/60 bg-card/90 p-6 shadow-[0_24px_80px_-32px_rgba(0,0,0,0.45)] backdrop-blur">
+				<div class="mb-4 flex items-center justify-between">
+					<p class="text-sm font-medium text-muted-foreground">Ответ базы знаний</p>
+					<span class="rounded-full bg-muted px-2 py-1 text-xs text-muted-foreground">{answer.mode}</span>
+				</div>
+				<div class="prose prose-invert max-w-none">
+					{#each answer.answer.split("\n") as line, index (index)}
+						<p class="mb-2 text-base leading-7">{line}</p>
+					{/each}
+				</div>
+			</div>
+		{/if}
 	</section>
 </main>

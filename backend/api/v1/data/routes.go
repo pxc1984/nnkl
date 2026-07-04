@@ -14,14 +14,16 @@ import (
 func RegisterDataRoutes(router gin.IRouter) {
 	client := &http.Client{Timeout: 2 * time.Minute}
 	a := &DataAPI{
-		store: store.GetStore(),
-		ocr:   NewOCRClient(utils.Settings.OCRServiceURL, client),
-		maxMB: utils.Settings.MaxUploadSizeMB,
+		store:    store.GetStore(),
+		ocr:      NewOCRClient(utils.Settings.OCRServiceURL, client),
+		lightrag: NewLightRAGClient(utils.Settings.LightRAGURL, client),
+		maxMB:    utils.Settings.MaxUploadSizeMB,
 	}
 
 	protected := router.Group("/data")
 	protected.Use(api.RequireAuth(a.store, auth2.NewManager(utils.Settings.AuthSecret, utils.Settings.AccessTokenTTL, utils.Settings.RefreshTokenTTL)))
 	protected.GET("", a.list)
 	protected.POST("", a.upload)
+	protected.POST("/ask", a.ask)
 	registerObjectRoutes(protected, a)
 }

@@ -3,9 +3,10 @@ package data
 import "github.com/pxc1984/nnkl-backend/store"
 
 type DataAPI struct {
-	store store.Store
-	ocr   *OCRClient
-	maxMB int64
+	store    store.Store
+	ocr      *OCRClient
+	lightrag *LightRAGClient
+	maxMB    int64
 }
 
 type DataUploadParams struct {

@@ -36,7 +36,7 @@
 	}
 
 	function handleKeyDown(event: KeyboardEvent) {
-		if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+		if (event.key === "Enter" && (!event.metaKey && !event.ctrlKey)) {
 			event.preventDefault();
 			void handleSubmit();
 		}

@@ -6,61 +6,58 @@ import (
 	"github.com/lib/pq"
 )
 
-type InputBlob struct {
+type Blob struct {
 	ID          string         `gorm:"type:uuid;primaryKey" json:"id"`
 	Filename    string         `gorm:"not null;index" json:"filename"`
 	FileType    string         `gorm:"not null;index" json:"type"`
-	ContentType string         `gorm:"not null" json:"contentType"`
-	Tags        pq.StringArray `gorm:"type:text[]" json:"tags"`
+	ContentType string         `gorm:"not null;index" json:"contentType"`
 	SizeBytes   int64          `gorm:"not null" json:"sizeBytes"`
-	SHA256      *string        `gorm:"size:64" json:"sha256,omitempty"`
+	SHA256      *string        `gorm:"size:64;index" json:"sha256,omitempty"`
 	Content     []byte         `gorm:"type:bytea;not null" json:"-"`
+	Tags        pq.StringArray `gorm:"-" json:"tags"`
 	CreatedAt   time.Time      `json:"createdAt"`
 	UpdatedAt   time.Time      `json:"updatedAt"`
 }
 
-type ParseJob struct {
-	ID           string      `gorm:"type:uuid;primaryKey" json:"id"`
-	DocumentID   string      `gorm:"index" json:"documentId"`
-	InputBlobID  string      `gorm:"type:uuid;index" json:"inputBlobId"`
-	Status       string      `json:"status"`
-	OutputFormat string      `json:"outputFormat"`
-	Language     string      `json:"language"`
-	Error        *string     `json:"error,omitempty"`
-	CreatedAt    time.Time   `json:"createdAt"`
-	UpdatedAt    time.Time   `json:"updatedAt"`
-	Result       ParseResult `gorm:"foreignKey:JobID;references:ID" json:"-"`
+func (Blob) TableName() string {
+	return "blobs"
 }
 
-func (ParseJob) TableName() string {
-	return "parse_jobs"
+type Upload struct {
+	ID           string    `gorm:"type:uuid;primaryKey" json:"id"`
+	InputBlobID  string    `gorm:"column:input_blob;type:uuid;index" json:"inputBlobId"`
+	OutputBlobID *string   `gorm:"column:output_blob;type:uuid;index" json:"outputBlobId,omitempty"`
+	Status       string    `json:"status"`
+	Language     string    `json:"language"`
+	Error        *string   `json:"error,omitempty"`
+	CreatedAt    time.Time `json:"createdAt"`
+	UpdatedAt    time.Time `json:"updatedAt"`
+	InputBlob    Blob      `gorm:"foreignKey:InputBlobID;references:ID" json:"-"`
+	OutputBlob   *Blob     `gorm:"foreignKey:OutputBlobID;references:ID" json:"-"`
 }
 
-type ParseResult struct {
-	ID          string    `gorm:"type:uuid;primaryKey" json:"id"`
-	JobID       string    `gorm:"type:uuid;uniqueIndex" json:"jobId"`
-	ContentType string    `json:"contentType"`
-	ContentText string    `json:"contentText"`
-	AssetsZip   []byte    `gorm:"type:bytea" json:"-"`
-	CreatedAt   time.Time `json:"createdAt"`
-	UpdatedAt   time.Time `json:"updatedAt"`
+func (Upload) TableName() string {
+	return "uploads"
 }
 
-func (ParseResult) TableName() string {
-	return "parse_results"
-}
-
-type CreateInputBlobParams struct {
+type CreateBlobParams struct {
 	Filename    string
 	FileType    string
 	ContentType string
-	Tags        []string
 	SizeBytes   int64
 	SHA256      *string
 	Content     []byte
 }
 
-type ListInputBlobsParams struct {
+type CreateUploadParams struct {
+	ID          string
+	InputBlobID string
+	Status      string
+	Language    string
+	Error       *string
+}
+
+type ListUploadsParams struct {
 	Page     int
 	PageSize int
 	Query    string
@@ -68,13 +65,10 @@ type ListInputBlobsParams struct {
 	Tags     []string
 }
 
-type UpdateInputBlobParams struct {
-	Filename    *string
-	FileType    *string
-	ContentType *string
-	Tags        []string
-	SizeBytes   *int64
-	SHA256      *string
-	Content     []byte
-	ReplaceFile bool
+type UpdateUploadParams struct {
+	InputBlobID  *string
+	OutputBlobID *string
+	Status       *string
+	Language     *string
+	Error        *string
 }

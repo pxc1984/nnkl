@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/lib/pq"
 	"gorm.io/gorm"
 )
 
@@ -19,8 +18,8 @@ type InMemoryStore struct {
 	byEmail  map[string]string
 	sessions map[string]Session
 	byHash   map[string]string
-	blobs    map[string]InputBlob
-	jobs     map[string]ParseJob
+	blobs    map[string]Blob
+	uploads  map[string]Upload
 }
 
 func NewInMemoryStore() *InMemoryStore {
@@ -29,8 +28,8 @@ func NewInMemoryStore() *InMemoryStore {
 		byEmail:  make(map[string]string),
 		sessions: make(map[string]Session),
 		byHash:   make(map[string]string),
-		blobs:    make(map[string]InputBlob),
-		jobs:     make(map[string]ParseJob),
+		blobs:    make(map[string]Blob),
+		uploads:  make(map[string]Upload),
 	}
 }
 
@@ -256,44 +255,97 @@ func (s *InMemoryStore) DeleteUserSessions(_ context.Context, userID string) err
 	return nil
 }
 
-func (s *InMemoryStore) CreateInputBlob(_ context.Context, params CreateInputBlobParams) (*InputBlob, error) {
+func (s *InMemoryStore) CreateBlob(_ context.Context, params CreateBlobParams) (*Blob, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	now := time.Now().UTC()
-	blob := InputBlob{
+	blob := Blob{
 		ID:          uuid.NewString(),
 		Filename:    params.Filename,
 		FileType:    params.FileType,
 		ContentType: params.ContentType,
-		Tags:        pq.StringArray(append([]string(nil), params.Tags...)),
 		SizeBytes:   params.SizeBytes,
 		SHA256:      params.SHA256,
 		Content:     append([]byte(nil), params.Content...),
 		CreatedAt:   now,
+		UpdatedAt:   now,
 	}
 	s.blobs[blob.ID] = blob
-	return cloneInputBlob(blob), nil
+	return cloneBlob(blob), nil
 }
 
-func (s *InMemoryStore) ListInputBlobs(_ context.Context, params ListInputBlobsParams) ([]InputBlob, int64, error) {
+func (s *InMemoryStore) GetBlobByID(_ context.Context, id string) (*Blob, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	blob, ok := s.blobs[id]
+	if !ok {
+		return nil, gorm.ErrRecordNotFound
+	}
+	return cloneBlob(blob), nil
+}
+
+func (s *InMemoryStore) GetBlobBySHA256(_ context.Context, sha256 string) (*Blob, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, blob := range s.blobs {
+		if blob.SHA256 != nil && *blob.SHA256 == sha256 {
+			return cloneBlob(blob), nil
+		}
+	}
+	return nil, gorm.ErrRecordNotFound
+}
+
+func (s *InMemoryStore) CreateUpload(_ context.Context, params CreateUploadParams) (*Upload, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.blobs[params.InputBlobID]; !ok {
+		return nil, gorm.ErrRecordNotFound
+	}
+	now := time.Now().UTC()
+	uploadID := params.ID
+	if uploadID == "" {
+		uploadID = uuid.NewString()
+	}
+	upload := Upload{
+		ID:          uploadID,
+		InputBlobID: params.InputBlobID,
+		Status:      params.Status,
+		Language:    params.Language,
+		Error:       params.Error,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+		InputBlob:   *cloneBlob(s.blobs[params.InputBlobID]),
+	}
+	s.uploads[upload.ID] = upload
+	return cloneUpload(upload), nil
+}
+
+func (s *InMemoryStore) ListUploads(_ context.Context, params ListUploadsParams) ([]Upload, int64, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	filtered := make([]InputBlob, 0)
-	for _, blob := range s.blobs {
+	filtered := make([]Upload, 0)
+	for _, upload := range s.uploads {
+		blob, ok := s.blobs[upload.InputBlobID]
+		if !ok {
+			continue
+		}
+		upload.InputBlob = *cloneBlob(blob)
+		if upload.OutputBlobID != nil {
+			if outputBlob, ok := s.blobs[*upload.OutputBlobID]; ok {
+				upload.OutputBlob = cloneBlob(outputBlob)
+			}
+		}
 		if params.Query != "" && !strings.Contains(strings.ToLower(blob.Filename), strings.ToLower(params.Query)) {
 			continue
 		}
 		if params.FileType != "" && blob.FileType != strings.ToLower(params.FileType) {
 			continue
 		}
-		if !containsAllTags(blob.Tags, params.Tags) {
-			continue
-		}
-		filtered = append(filtered, blob)
+		filtered = append(filtered, upload)
 	}
 
-	slices.SortFunc(filtered, func(a, b InputBlob) int {
+	slices.SortFunc(filtered, func(a, b Upload) int {
 		return b.CreatedAt.Compare(a.CreatedAt)
 	})
 
@@ -310,79 +362,80 @@ func (s *InMemoryStore) ListInputBlobs(_ context.Context, params ListInputBlobsP
 	}
 	start := (page - 1) * pageSize
 	if start >= len(filtered) {
-		return []InputBlob{}, int64(len(filtered)), nil
+		return []Upload{}, int64(len(filtered)), nil
 	}
 	end := start + pageSize
 	if end > len(filtered) {
 		end = len(filtered)
 	}
 
-	items := make([]InputBlob, 0, end-start)
-	for _, blob := range filtered[start:end] {
-		items = append(items, *cloneInputBlob(blob))
+	items := make([]Upload, 0, end-start)
+	for _, upload := range filtered[start:end] {
+		items = append(items, *cloneUpload(upload))
 	}
 	return items, int64(len(filtered)), nil
 }
 
-func (s *InMemoryStore) GetInputBlobByID(_ context.Context, id string) (*InputBlob, error) {
+func (s *InMemoryStore) GetUploadByID(_ context.Context, id string) (*Upload, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	blob, ok := s.blobs[id]
+	upload, ok := s.uploads[id]
 	if !ok {
 		return nil, gorm.ErrRecordNotFound
 	}
-	return cloneInputBlob(blob), nil
-}
-
-func (s *InMemoryStore) UpdateInputBlob(_ context.Context, id string, params UpdateInputBlobParams) (*InputBlob, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	blob, ok := s.blobs[id]
+	inputBlob, ok := s.blobs[upload.InputBlobID]
 	if !ok {
 		return nil, gorm.ErrRecordNotFound
 	}
-	if params.Filename != nil {
-		blob.Filename = *params.Filename
-	}
-	if params.FileType != nil {
-		blob.FileType = strings.ToLower(*params.FileType)
-	}
-	if params.ContentType != nil {
-		blob.ContentType = *params.ContentType
-	}
-	blob.Tags = pq.StringArray(append([]string(nil), params.Tags...))
-	if params.ReplaceFile {
-		blob.Content = append([]byte(nil), params.Content...)
-		if params.SizeBytes != nil {
-			blob.SizeBytes = *params.SizeBytes
+	upload.InputBlob = *cloneBlob(inputBlob)
+	if upload.OutputBlobID != nil {
+		if outputBlob, ok := s.blobs[*upload.OutputBlobID]; ok {
+			upload.OutputBlob = cloneBlob(outputBlob)
 		}
-		blob.SHA256 = params.SHA256
 	}
-	blob.UpdatedAt = time.Now().UTC()
-	s.blobs[id] = blob
-	return cloneInputBlob(blob), nil
+	return cloneUpload(upload), nil
 }
 
-func (s *InMemoryStore) DeleteInputBlobByID(_ context.Context, id string) error {
+func (s *InMemoryStore) UpdateUpload(_ context.Context, id string, params UpdateUploadParams) (*Upload, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if _, ok := s.blobs[id]; !ok {
+	upload, ok := s.uploads[id]
+	if !ok {
+		return nil, gorm.ErrRecordNotFound
+	}
+	if params.InputBlobID != nil {
+		upload.InputBlobID = *params.InputBlobID
+	}
+	if params.OutputBlobID != nil {
+		upload.OutputBlobID = params.OutputBlobID
+	}
+	if params.Status != nil {
+		upload.Status = *params.Status
+	}
+	if params.Language != nil {
+		upload.Language = *params.Language
+	}
+	if params.Error != nil {
+		upload.Error = params.Error
+	}
+	upload.UpdatedAt = time.Now().UTC()
+	s.uploads[id] = upload
+	return cloneUpload(upload), nil
+}
+
+func (s *InMemoryStore) DeleteUploadByID(_ context.Context, id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	upload, ok := s.uploads[id]
+	if !ok {
 		return gorm.ErrRecordNotFound
 	}
-	delete(s.blobs, id)
-	delete(s.jobs, id)
-	return nil
-}
-
-func (s *InMemoryStore) GetParseJobByDocumentID(_ context.Context, documentID string) (*ParseJob, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	job, ok := s.jobs[documentID]
-	if !ok {
-		return nil, gorm.ErrRecordNotFound
+	delete(s.uploads, id)
+	s.deleteBlobIfUnreferenced(upload.InputBlobID)
+	if upload.OutputBlobID != nil {
+		s.deleteBlobIfUnreferenced(*upload.OutputBlobID)
 	}
-	clone := job
-	return &clone, nil
+	return nil
 }
 
 func cloneUser(user User) *User {
@@ -395,11 +448,31 @@ func cloneSession(session Session) *Session {
 	return &clone
 }
 
-func cloneInputBlob(blob InputBlob) *InputBlob {
+func cloneBlob(blob Blob) *Blob {
 	clone := blob
-	clone.Tags = pq.StringArray(append([]string(nil), blob.Tags...))
 	clone.Content = append([]byte(nil), blob.Content...)
 	return &clone
+}
+
+func cloneUpload(upload Upload) *Upload {
+	clone := upload
+	clone.InputBlob = *cloneBlob(upload.InputBlob)
+	if upload.OutputBlob != nil {
+		clone.OutputBlob = cloneBlob(*upload.OutputBlob)
+	}
+	return &clone
+}
+
+func (s *InMemoryStore) deleteBlobIfUnreferenced(blobID string) {
+	for _, upload := range s.uploads {
+		if upload.InputBlobID == blobID {
+			return
+		}
+		if upload.OutputBlobID != nil && *upload.OutputBlobID == blobID {
+			return
+		}
+	}
+	delete(s.blobs, blobID)
 }
 
 func containsAllTags(blobTags, filterTags []string) bool {

@@ -8,16 +8,18 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
-from app.db.models import InputBlob, ParseJob
+from app.db.models import Blob, Upload
 
 
 def _insert_blob(
     db_session, sample_pdf: Path, blob_id: str = "00000000-0000-0000-0000-000000000001"
-) -> InputBlob:
-    blob = InputBlob(
+) -> Blob:
+    blob = Blob(
         id=uuid.UUID(blob_id),
         filename=sample_pdf.name,
+        file_type="pdf",
         content_type="application/pdf",
+        size_bytes=len(sample_pdf.read_bytes()),
         content=sample_pdf.read_bytes(),
     )
     db_session.add(blob)
@@ -32,11 +34,13 @@ def _insert_blob_bytes(
     filename: str,
     content_type: str,
     content: bytes,
-) -> InputBlob:
-    blob = InputBlob(
+) -> Blob:
+    blob = Blob(
         id=uuid.UUID(blob_id),
         filename=filename,
+        file_type=filename.rsplit(".", 1)[-1].lower(),
         content_type=content_type,
+        size_bytes=len(content),
         content=content,
     )
     db_session.add(blob)
@@ -64,7 +68,7 @@ class TestParseEndpoint:
         response = client.post(
             "/api/v1/parse",
             json={
-                "document_id": "doc-native-pdf",
+                "upload_id": blob_id,
                 "input_blob_id": blob_id,
                 "language": "auto",
             },
@@ -73,7 +77,7 @@ class TestParseEndpoint:
         assert response.status_code == 201
         mock_get_ocr_service.assert_not_called()
 
-        result_response = client.get("/api/v1/result/doc-native-pdf")
+        result_response = client.get(f"/api/v1/result/{blob_id}")
         assert result_response.status_code == 200
         content = result_response.json()["content_text"]
         assert "Test material" in content
@@ -101,7 +105,7 @@ class TestParseEndpoint:
             response = client.post(
                 "/api/v1/parse",
                 json={
-                    "document_id": "doc-fallback-pdf",
+                    "upload_id": blob_id,
                     "input_blob_id": blob_id,
                     "language": "auto",
                 },
@@ -127,7 +131,7 @@ class TestParseEndpoint:
             response = client.post(
                 "/api/v1/parse",
                 json={
-                    "document_id": "doc-1",
+                    "upload_id": blob_id,
                     "input_blob_id": blob_id,
                     "language": "auto",
                 },
@@ -135,21 +139,22 @@ class TestParseEndpoint:
 
         assert response.status_code == 201
         data = response.json()
-        assert data["document_id"] == "doc-1"
+        assert data["upload_id"] == blob_id
         assert data["status"] == "completed"
-        assert data["result_id"]
+        assert data["output_blob_id"]
 
-        job = db_session.query(ParseJob).filter(ParseJob.document_id == "doc-1").one()
+        job = db_session.get(Upload, uuid.UUID(blob_id))
+        assert job is not None
         assert job.status == "completed"
-        assert job.result is not None
-        assert job.result.content_text.endswith("parsed content")
+        assert job.output_blob is not None
+        assert job.output_blob.content.decode("utf-8").endswith("parsed content")
 
     def test_parse_missing_blob_returns_404(self, client: TestClient) -> None:
         missing_blob_id = str(uuid.uuid4())
         response = client.post(
             "/api/v1/parse",
             json={
-                "document_id": "doc-missing",
+                "upload_id": missing_blob_id,
                 "input_blob_id": missing_blob_id,
                 "language": "auto",
             },
@@ -163,7 +168,6 @@ class TestStatusAndResultEndpoints:
     def test_status_and_result_return_db_content(
         self, mock_get_ocr_service, client: TestClient, db_session, sample_pdf: Path
     ) -> None:
-        document_id = f"doc-{uuid.uuid4()}"
         blob_id = str(uuid.uuid4())
         _insert_blob(db_session, sample_pdf, blob_id=blob_id)
         ocr_service = mock_get_ocr_service.return_value
@@ -176,18 +180,18 @@ class TestStatusAndResultEndpoints:
             parse_response = client.post(
                 "/api/v1/parse",
                 json={
-                    "document_id": document_id,
+                    "upload_id": blob_id,
                     "input_blob_id": blob_id,
                     "language": "en",
                 },
             )
         assert parse_response.status_code == 201
 
-        status_response = client.get(f"/api/v1/status/{document_id}")
+        status_response = client.get(f"/api/v1/status/{blob_id}")
         assert status_response.status_code == 200
         assert status_response.json()["status"] == "completed"
 
-        result_response = client.get(f"/api/v1/result/{document_id}")
+        result_response = client.get(f"/api/v1/result/{blob_id}")
         assert result_response.status_code == 200
         data = result_response.json()
         assert data["content_type"] == "text/markdown"
@@ -211,14 +215,14 @@ class TestNativeOfficeExtraction:
         response = client.post(
             "/api/v1/parse",
             json={
-                "document_id": "doc-docx",
+                "upload_id": blob_id,
                 "input_blob_id": blob_id,
                 "language": "auto",
             },
         )
 
         assert response.status_code == 201
-        result_response = client.get("/api/v1/result/doc-docx")
+        result_response = client.get(f"/api/v1/result/{blob_id}")
         assert result_response.status_code == 200
         content = result_response.json()["content_text"]
         assert "DOCX title" in content
@@ -240,14 +244,14 @@ class TestNativeOfficeExtraction:
         response = client.post(
             "/api/v1/parse",
             json={
-                "document_id": "doc-pptx",
+                "upload_id": blob_id,
                 "input_blob_id": blob_id,
                 "language": "auto",
             },
         )
 
         assert response.status_code == 201
-        result_response = client.get("/api/v1/result/doc-pptx")
+        result_response = client.get(f"/api/v1/result/{blob_id}")
         assert result_response.status_code == 200
         content = result_response.json()["content_text"]
         assert "Slide 1" in content

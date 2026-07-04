@@ -24,6 +24,7 @@ TEST_DATABASE = TEST_ROOT / "test.sqlite3"
 
 os.environ.setdefault("DATABASE_URL", f"sqlite:///{TEST_DATABASE}")
 os.environ.setdefault("TEMP_DIR", str(TEST_ROOT / "tmp"))
+os.environ.setdefault("OCR_TEMP_DIR", str(TEST_ROOT / "tmp"))
 os.environ.setdefault("MINERU_USE_GPU", "false")
 
 

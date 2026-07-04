@@ -15,7 +15,7 @@ func (a *DataAPI) list(c *gin.Context) {
 	pageSize := parsePositiveInt(c.DefaultQuery("pageSize", "20"), 20)
 	tags := trimNonEmpty(c.QueryArray("tags"))
 
-	blobs, total, err := a.store.ListInputBlobs(c.Request.Context(), store.ListInputBlobsParams{
+	uploads, total, err := a.store.ListUploads(c.Request.Context(), store.ListUploadsParams{
 		Page:     page,
 		PageSize: pageSize,
 		Query:    strings.TrimSpace(c.Query("query")),
@@ -33,6 +33,11 @@ func (a *DataAPI) list(c *gin.Context) {
 	}
 	if totalPages == 0 {
 		totalPages = 1
+	}
+
+	blobs := make([]store.Blob, 0, len(uploads))
+	for i := range uploads {
+		blobs = append(blobs, uploads[i].InputBlob)
 	}
 
 	c.JSON(http.StatusOK, shared.PaginatedKnowledgeObjectList{

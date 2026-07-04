@@ -5,16 +5,16 @@ from __future__ import annotations
 import shutil
 import tempfile
 import uuid
-import zipfile
-from io import BytesIO
 from pathlib import Path
+from hashlib import sha256
 
 import structlog
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.schemas import ParseRequest, TaskStatus
 from app.config import Settings
-from app.db.models import InputBlob, ParseJob, ParseResult
+from app.db.models import Blob, Upload
 from app.services.ocr_service import get_ocr_service
 from app.use_cases.document_extractor import (
     extract_native_document_text,
@@ -35,23 +35,17 @@ def parse_document(
     *,
     settings: Settings,
     correlation_id: str | None,
-) -> ParseJob:
-    blob = session.get(InputBlob, request.input_blob_id)
+) -> Upload:
+    blob = session.get(Blob, request.input_blob_id)
     if blob is None:
         raise InputBlobNotFoundError(request.input_blob_id)
 
-    job = (
-        session.query(ParseJob)
-        .filter(ParseJob.document_id == request.document_id)
-        .one_or_none()
-    )
+    job = session.get(Upload, request.upload_id)
     if job is None:
-        job = ParseJob(
-            id=uuid.uuid4(),
-            document_id=request.document_id,
+        job = Upload(
+            id=request.upload_id,
             input_blob_id=blob.id,
             status=TaskStatus.PROCESSING.value,
-            output_format="markdown",
             language=request.language.value,
             error=None,
         )
@@ -59,7 +53,6 @@ def parse_document(
     else:
         job.input_blob_id = blob.id
         job.status = TaskStatus.PROCESSING.value
-        job.output_format = "markdown"
         job.language = request.language.value
         job.error = None
     session.commit()
@@ -83,20 +76,14 @@ def parse_document(
 
         content = f"<!-- source: {blob.filename} -->\n\n{content.strip()}"
 
-        result = job.result
-        if result is None:
-            result = ParseResult(
-                id=uuid.uuid4(),
-                job_id=job.id,
-                content_type="text/markdown",
-                content_text=content,
-                assets_zip=_pack_assets(image_dir),
-            )
-            session.add(result)
-        else:
-            result.content_type = "text/markdown"
-            result.content_text = content
-            result.assets_zip = _pack_assets(image_dir)
+        output_blob = _get_or_create_blob(
+            session,
+            filename=f"{Path(blob.filename).stem}.md",
+            file_type="markdown",
+            content_type="text/markdown",
+            content=content.encode("utf-8"),
+        )
+        job.output_blob_id = output_blob.id
 
         job.status = TaskStatus.COMPLETED.value
         session.commit()
@@ -171,15 +158,28 @@ def _parse_input_document(
 
     content = extract_native_document_text(input_path)
     return content, None
+def _get_or_create_blob(
+    session: Session,
+    *,
+    filename: str,
+    file_type: str,
+    content_type: str,
+    content: bytes,
+) -> Blob:
+    digest = sha256(content).hexdigest()
+    existing = session.scalar(select(Blob).where(Blob.sha256 == digest))
+    if existing is not None:
+        return existing
 
-
-def _pack_assets(image_dir: Path | None) -> bytes | None:
-    if image_dir is None or not image_dir.exists() or not any(image_dir.iterdir()):
-        return None
-
-    buffer = BytesIO()
-    with zipfile.ZipFile(buffer, mode="w", compression=zipfile.ZIP_DEFLATED) as archive:
-        for path in sorted(image_dir.rglob("*")):
-            if path.is_file():
-                archive.write(path, arcname=path.relative_to(image_dir))
-    return buffer.getvalue()
+    blob = Blob(
+        id=uuid.uuid4(),
+        filename=filename,
+        file_type=file_type,
+        content_type=content_type,
+        size_bytes=len(content),
+        sha256=digest,
+        content=content,
+    )
+    session.add(blob)
+    session.flush()
+    return blob

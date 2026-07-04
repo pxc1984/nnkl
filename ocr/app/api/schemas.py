@@ -22,7 +22,7 @@ class Language(str, Enum):
 class ParseRequest(BaseModel):
     """Запрос OCR-парсинга документа, загруженного gateway в shared Postgres."""
 
-    document_id: str = Field(..., min_length=1, max_length=255)
+    upload_id: uuid.UUID
     input_blob_id: uuid.UUID
     language: Language = Language.AUTO
 
@@ -35,20 +35,17 @@ class TaskStatus(str, Enum):
 
 
 class ParseResponse(BaseModel):
-    document_id: str
-    job_id: uuid.UUID
-    result_id: uuid.UUID
+    upload_id: uuid.UUID
+    output_blob_id: uuid.UUID
     status: Literal[TaskStatus.COMPLETED] = TaskStatus.COMPLETED
 
 
 class StatusResponse(BaseModel):
-    document_id: str
-    job_id: uuid.UUID
+    upload_id: uuid.UUID
     status: TaskStatus
     input_blob_id: uuid.UUID
-    output_format: OutputFormat
+    output_blob_id: uuid.UUID | None = None
     language: Language
-    result_id: uuid.UUID | None = None
     error: str | None = None
 
 
@@ -64,9 +61,8 @@ class ErrorResponse(BaseModel):
 
 
 class ParseResultResponse(BaseModel):
-    document_id: str
-    job_id: uuid.UUID
-    result_id: uuid.UUID
+    upload_id: uuid.UUID
+    output_blob_id: uuid.UUID
     content_type: str
     content_text: str
     has_assets_zip: bool

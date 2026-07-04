@@ -21,11 +21,32 @@ import (
 )
 
 func (a *DataAPI) reprocessBlob(c *gin.Context, blobID, outputFormat, language string) error {
+	upload, err := a.store.GetUploadByID(c.Request.Context(), blobID)
+	if err != nil {
+		api.RespondError(c, http.StatusInternalServerError, "failed to load upload", "internal_error")
+		return err
+	}
+	if isMarkdownBlob(&upload.InputBlob) {
+		status := "completed"
+		outputBlobID := upload.InputBlobID
+		if _, err := a.store.UpdateUpload(c.Request.Context(), upload.ID, store.UpdateUploadParams{
+			OutputBlobID: &outputBlobID,
+			Status:       &status,
+			Language:     &language,
+			Error:        stringPtr(""),
+		}); err != nil {
+			api.RespondError(c, http.StatusInternalServerError, "failed to finalize markdown upload", "internal_error")
+			return err
+		}
+		if outputFormat == "markdown" && a.lightrag != nil && a.lightrag.IsConfigured() {
+			a.sendToLightRAG(c, blobID, outputFormat)
+		}
+		return nil
+	}
 	if err := a.ocr.Parse(c.Request.Context(), OCRParseRequest{
-		DocumentID:   blobID,
-		InputBlobID:  blobID,
-		OutputFormat: outputFormat,
-		Language:     language,
+		UploadID:    blobID,
+		InputBlobID: upload.InputBlobID,
+		Language:    language,
 	}); err != nil {
 		api.RespondError(c, http.StatusBadGateway, fmt.Sprintf("ocr parse failed: %v", err), "ocr_error")
 		return err
@@ -38,35 +59,37 @@ func (a *DataAPI) reprocessBlob(c *gin.Context, blobID, outputFormat, language s
 }
 
 func (a *DataAPI) sendToLightRAG(c *gin.Context, blobID, outputFormat string) {
-	job, err := a.store.GetParseJobByDocumentID(c.Request.Context(), blobID)
+	upload, err := a.store.GetUploadByID(c.Request.Context(), blobID)
 	if err != nil {
-		slog.Warn("lightrag: failed to fetch parse job", "blob_id", blobID, "error", err)
+		slog.Warn("lightrag: failed to fetch upload", "blob_id", blobID, "error", err)
 		return
 	}
-	if job.Result.ContentText == "" {
-		slog.Warn("lightrag: parse result has no content text", "blob_id", blobID)
+	if upload.OutputBlob == nil || len(upload.OutputBlob.Content) == 0 {
+		slog.Warn("lightrag: output blob has no content", "blob_id", blobID)
 		return
 	}
 
 	source := fmt.Sprintf("%s.md", blobID)
-	if err := a.lightrag.SendText(c.Request.Context(), job.Result.ContentText, source); err != nil {
+	if err := a.lightrag.SendText(c.Request.Context(), string(upload.OutputBlob.Content), source); err != nil {
 		slog.Warn("lightrag: failed to send text", "blob_id", blobID, "error", err)
 		return
 	}
 	slog.Info("lightrag: text indexed", "blob_id", blobID, "source", source)
 }
 
-func (a *DataAPI) persistFile(c *gin.Context, fileHeader *multipart.FileHeader, fileType string, tags []string) (*store.InputBlob, error) {
+func (a *DataAPI) persistFile(c *gin.Context, fileHeader *multipart.FileHeader, fileType string, tags []string) (*store.Blob, error) {
 	content, contentType, sha, err := readMultipartFile(fileHeader)
 	if err != nil {
 		return nil, err
 	}
+	if existing, err := a.store.GetBlobBySHA256(c.Request.Context(), sha); err == nil {
+		return existing, nil
+	}
 
-	return a.store.CreateInputBlob(c.Request.Context(), store.CreateInputBlobParams{
+	return a.store.CreateBlob(c.Request.Context(), store.CreateBlobParams{
 		Filename:    fileHeader.Filename,
 		FileType:    fileType,
 		ContentType: contentType,
-		Tags:        tags,
 		SizeBytes:   int64(len(content)),
 		SHA256:      &sha,
 		Content:     content,
@@ -155,9 +178,15 @@ func detectSupportedFileType(filename string) string {
 		return "docx"
 	case ".pptx":
 		return "pptx"
+	case ".md":
+		return "markdown"
 	default:
 		return ""
 	}
+}
+
+func isMarkdownBlob(blob *store.Blob) bool {
+	return blob != nil && blob.FileType == "markdown"
 }
 
 func trimNonEmpty(values []string) []string {
@@ -184,4 +213,8 @@ func defaultString(value, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+func stringPtr(value string) *string {
+	return &value
 }

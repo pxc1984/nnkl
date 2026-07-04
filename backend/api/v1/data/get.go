@@ -8,27 +8,23 @@ import (
 )
 
 func (a *DataAPI) get(c *gin.Context) {
-	blob, err := a.store.GetInputBlobByID(c.Request.Context(), c.Param("id"))
+	upload, err := a.store.GetUploadByID(c.Request.Context(), c.Param("id"))
 	if err != nil {
 		respondStoreNotFound(c, err, "object not found")
 		return
 	}
+	blob := &upload.InputBlob
 
 	response := shared.KnowledgeObjectDetails{
 		KnowledgeObject: shared.KnowledgeObject{
 			KnowledgeObjectResponse: shared.ToKnowledgeObjectResponse(blob),
+			Status:                  upload.Status,
 		},
 		SHA256:     blob.SHA256,
 		HasContent: len(blob.Content) > 0,
-	}
-
-	job, err := a.store.GetParseJobByDocumentID(c.Request.Context(), blob.ID)
-	if err == nil {
-		response.Status = job.Status
-		response.OutputFormat = job.OutputFormat
-		response.Language = job.Language
-		response.Error = job.Error
-		response.HasResult = job.Result.ID != ""
+		Language:   upload.Language,
+		Error:      upload.Error,
+		HasResult:  upload.OutputBlobID != nil,
 	}
 
 	c.JSON(http.StatusOK, response)

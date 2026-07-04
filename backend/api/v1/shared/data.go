@@ -44,7 +44,7 @@ type PaginatedKnowledgeObjectList struct {
 	Meta  PaginationMeta            `json:"meta"`
 }
 
-func ToKnowledgeObjectResponse(blob *store.InputBlob) KnowledgeObjectResponse {
+func ToKnowledgeObjectResponse(blob *store.Blob) KnowledgeObjectResponse {
 	return KnowledgeObjectResponse{
 		ID:          blob.ID,
 		Filename:    blob.Filename,
@@ -57,7 +57,7 @@ func ToKnowledgeObjectResponse(blob *store.InputBlob) KnowledgeObjectResponse {
 	}
 }
 
-func ToKnowledgeObjectResponses(blobs []store.InputBlob) []KnowledgeObjectResponse {
+func ToKnowledgeObjectResponses(blobs []store.Blob) []KnowledgeObjectResponse {
 	response := make([]KnowledgeObjectResponse, 0, len(blobs))
 	for i := range blobs {
 		response = append(response, ToKnowledgeObjectResponse(&blobs[i]))

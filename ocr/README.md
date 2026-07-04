@@ -4,9 +4,9 @@ FastAPI parsing microservice for synchronous processing of `pdf`, `docx`, and `p
 
 ## Flow
 
-1. Gateway stores document bytes in shared Postgres table `input_blobs`.
-2. Gateway sends `POST /api/v1/parse` with `document_id`, `input_blob_id`, `language`.
-3. OCR service reads the blob from Postgres, parses `pdf` through MinerU and extracts `docx` / `pptx` text natively, stores output in Postgres tables `parse_jobs` and `parse_results`, and returns `201 Created`.
+1. Gateway stores document bytes in shared Postgres table `blobs`.
+2. Gateway creates or updates an `uploads` row and sends `POST /api/v1/parse` with `upload_id`, `input_blob_id`, `language`.
+3. OCR service reads the input blob from Postgres, parses `pdf` through MinerU and extracts `docx` / `pptx` text natively, stores parsed markdown in `blobs`, links it as `uploads.output_blob`, and returns `201 Created`.
 4. Gateway can read status and result through OCR API or directly from the shared database.
 
 ## API
@@ -17,7 +17,7 @@ FastAPI parsing microservice for synchronous processing of `pdf`, `docx`, and `p
 curl -X POST http://localhost:8000/api/v1/parse \
   -H "Content-Type: application/json" \
   -d '{
-    "document_id": "doc-123",
+    "upload_id": "00000000-0000-0000-0000-000000000123",
     "input_blob_id": "blob-123",
     "language": "auto"
   }'
@@ -27,9 +27,8 @@ Successful response:
 
 ```json
 {
-  "document_id": "doc-123",
-  "job_id": "job-uuid",
-  "result_id": "result-uuid",
+  "upload_id": "00000000-0000-0000-0000-000000000123",
+  "output_blob_id": "result-uuid",
   "status": "completed"
 }
 ```
@@ -37,13 +36,13 @@ Successful response:
 ### Status
 
 ```bash
-curl http://localhost:8000/api/v1/status/doc-123
+curl http://localhost:8000/api/v1/status/00000000-0000-0000-0000-000000000123
 ```
 
 ### Result
 
 ```bash
-curl http://localhost:8000/api/v1/result/doc-123
+curl http://localhost:8000/api/v1/result/00000000-0000-0000-0000-000000000123
 ```
 
 ### Health
@@ -54,9 +53,8 @@ curl http://localhost:8000/api/v1/health
 
 ## Shared database tables
 
-- `input_blobs`: source PDF bytes written by gateway
-- `parse_jobs`: OCR execution status keyed by `document_id`
-- `parse_results`: parsed text and optional zipped assets
+- `blobs`: shared binary content store for source files and parsed markdown
+- `uploads`: upload status plus foreign keys to `input_blob` and `output_blob`
 
 Tables are created automatically on startup.
 

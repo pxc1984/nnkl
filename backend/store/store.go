@@ -27,12 +27,14 @@ type Store interface {
 	DeleteSessionByID(context.Context, string) error
 	DeleteSessionByUserAndHash(context.Context, string, string) error
 	DeleteUserSessions(context.Context, string) error
-	CreateInputBlob(context.Context, CreateInputBlobParams) (*InputBlob, error)
-	ListInputBlobs(context.Context, ListInputBlobsParams) ([]InputBlob, int64, error)
-	GetInputBlobByID(context.Context, string) (*InputBlob, error)
-	UpdateInputBlob(context.Context, string, UpdateInputBlobParams) (*InputBlob, error)
-	DeleteInputBlobByID(context.Context, string) error
-	GetParseJobByDocumentID(context.Context, string) (*ParseJob, error)
+	CreateBlob(context.Context, CreateBlobParams) (*Blob, error)
+	GetBlobByID(context.Context, string) (*Blob, error)
+	GetBlobBySHA256(context.Context, string) (*Blob, error)
+	CreateUpload(context.Context, CreateUploadParams) (*Upload, error)
+	ListUploads(context.Context, ListUploadsParams) ([]Upload, int64, error)
+	GetUploadByID(context.Context, string) (*Upload, error)
+	UpdateUpload(context.Context, string, UpdateUploadParams) (*Upload, error)
+	DeleteUploadByID(context.Context, string) error
 }
 
 var globalStore Store

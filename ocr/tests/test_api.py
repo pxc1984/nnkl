@@ -76,8 +76,8 @@ class TestParseEndpoint:
         result_response = client.get("/api/v1/result/doc-native-pdf")
         assert result_response.status_code == 200
         content = result_response.json()["content_text"]
-        assert "Тестовый материал" in content
-        assert "ГОСТ 19281" in content
+        assert "Test material" in content
+        assert "GOST 19281" in content
 
     @patch("app.use_cases.parse_document.extract_native_document_text")
     @patch("app.use_cases.parse_document.get_ocr_service")
@@ -120,7 +120,8 @@ class TestParseEndpoint:
         ocr_service = mock_get_ocr_service.return_value
         ocr_service.convert.return_value = ("parsed content", None)
 
-        response = client.post(
+        with patch("app.use_cases.parse_document.should_use_native_pdf_text", return_value=False):
+            response = client.post(
             "/api/v1/parse",
             json={
                 "document_id": "doc-1",
@@ -138,7 +139,7 @@ class TestParseEndpoint:
         job = db_session.query(ParseJob).filter(ParseJob.document_id == "doc-1").one()
         assert job.status == "completed"
         assert job.result is not None
-        assert job.result.content_text == "parsed content"
+        assert job.result.content_text.endswith("parsed content")
 
     def test_parse_missing_blob_returns_404(self, client: TestClient) -> None:
         missing_blob_id = str(uuid.uuid4())
@@ -165,7 +166,8 @@ class TestStatusAndResultEndpoints:
         ocr_service = mock_get_ocr_service.return_value
         ocr_service.convert.return_value = ("# markdown", None)
 
-        parse_response = client.post(
+        with patch("app.use_cases.parse_document.should_use_native_pdf_text", return_value=False):
+            parse_response = client.post(
             "/api/v1/parse",
             json={
                 "document_id": document_id,
@@ -183,7 +185,7 @@ class TestStatusAndResultEndpoints:
         assert result_response.status_code == 200
         data = result_response.json()
         assert data["content_type"] == "text/markdown"
-        assert data["content_text"] == "# markdown"
+        assert data["content_text"].endswith("# markdown")
         assert data["has_assets_zip"] is False
 
 

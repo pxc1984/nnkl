@@ -1,4 +1,4 @@
-"""Lightweight native text extraction for office documents."""
+"""Native extraction for documents with a reliable text layer."""
 
 from __future__ import annotations
 
@@ -9,8 +9,11 @@ import fitz
 from docx import Document as DocxDocument
 from pptx import Presentation
 
-_ALLOWED_CONTROL_CHARS = {"\n", "\r", "\t"}
-_CONTROL_CHAR_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+from app.services.pdf_quality import analyze_pdf, sanitize_text
+
+_PAGE_MARKER = "<!-- page: {page_number} -->"
+_WHITESPACE_LINES_RE = re.compile(r"[ \t]+\n")
+_EXCESS_NEWLINES_RE = re.compile(r"\n{3,}")
 
 
 class UnsupportedDocumentTypeError(Exception):
@@ -30,31 +33,27 @@ def extract_native_document_text(file_path: Path) -> str:
     )
 
 
-def has_native_pdf_text(file_path: Path, *, min_chars: int = 50) -> bool:
-    """Heuristic: enough extractable text on the first page means a native-text PDF."""
+def has_native_pdf_text(file_path: Path, *, min_chars: int = 40) -> bool:
+    """Returns true when at least one page has a usable native text layer."""
     try:
-        with fitz.open(file_path) as document:
-            if document.page_count == 0:
-                return False
-            return (
-                len(sanitize_extracted_text(document[0].get_text()).strip())
-                >= min_chars
-            )
+        report = analyze_pdf(file_path, minimum_characters=min_chars)
+        return report.usable_pages > 0
     except Exception:  # noqa: BLE001
         return False
 
 
-def should_use_native_pdf_text(file_path: Path, *, min_chars: int = 50) -> bool:
-    """Uses native extraction only when the text layer looks usable."""
+def should_use_native_pdf_text(
+    file_path: Path,
+    *,
+    min_chars: int = 40,
+    minimum_usable_ratio: float = 0.95,
+) -> bool:
+    """Uses native extraction only when nearly every page has reliable text."""
     try:
-        with fitz.open(file_path) as document:
-            if document.page_count == 0:
-                return False
-            raw_text = document[0].get_text()
-            sanitized = sanitize_extracted_text(raw_text).strip()
-            return len(sanitized) >= min_chars and _is_reasonable_pdf_text(
-                raw_text, sanitized
-            )
+        report = analyze_pdf(file_path, minimum_characters=min_chars)
+        return report.supports_native_extraction(
+            minimum_usable_ratio=minimum_usable_ratio
+        )
     except Exception:  # noqa: BLE001
         return False
 
@@ -62,67 +61,64 @@ def should_use_native_pdf_text(file_path: Path, *, min_chars: int = 50) -> bool:
 def _extract_pdf_text(file_path: Path) -> str:
     pages: list[str] = []
     with fitz.open(file_path) as document:
-        for page in document:
-            text = sanitize_extracted_text(page.get_text()).strip()
+        for page_number, page in enumerate(document, start=1):
+            text = _clean_extracted_text(page.get_text())
             if text:
-                pages.append(text)
+                pages.append(
+                    f"{_PAGE_MARKER.format(page_number=page_number)}\n\n{text}"
+                )
     return "\n\n".join(pages).strip()
 
 
 def sanitize_extracted_text(text: str) -> str:
-    """Removes NUL and other disallowed control characters from extracted text."""
-    if not text:
-        return ""
-    return "".join(
-        char for char in text if char >= " " or char in _ALLOWED_CONTROL_CHARS
-    )
+    """Compatibility wrapper used by tests and callers."""
+    return sanitize_text(text)
 
 
 def _is_reasonable_pdf_text(raw_text: str, sanitized_text: str) -> bool:
-    if not sanitized_text:
-        return False
+    """Compatibility quality check for a single page."""
+    from app.services.pdf_quality import analyze_text
 
-    control_chars = len(_CONTROL_CHAR_RE.findall(raw_text))
-    if control_chars / max(len(raw_text), 1) > 0.01:
-        return False
+    quality = analyze_text(raw_text, page_number=1)
+    return quality.usable and bool(sanitized_text)
 
-    printable_chars = sum(1 for char in sanitized_text if not char.isspace())
-    if printable_chars == 0:
-        return False
 
-    alpha_chars = sum(1 for char in sanitized_text if char.isalpha())
-    return (alpha_chars / printable_chars) >= 0.2
+def _clean_extracted_text(text: str) -> str:
+    cleaned = sanitize_text(text).replace("\u00ad", "")
+    cleaned = _WHITESPACE_LINES_RE.sub("\n", cleaned)
+    cleaned = _EXCESS_NEWLINES_RE.sub("\n\n", cleaned)
+    return cleaned.strip()
 
 
 def _extract_docx_text(file_path: Path) -> str:
     document = DocxDocument(file_path)
-    lines = [
-        paragraph.text.strip()
-        for paragraph in document.paragraphs
-        if paragraph.text.strip()
-    ]
+    blocks: list[str] = []
+    for paragraph in document.paragraphs:
+        text = _clean_extracted_text(paragraph.text)
+        if text:
+            blocks.append(text)
 
     for table in document.tables:
+        rows: list[str] = []
         for row in table.rows:
-            cells = [cell.text.strip() for cell in row.cells if cell.text.strip()]
-            if cells:
-                lines.append(" | ".join(cells))
+            cells = [_clean_extracted_text(cell.text) for cell in row.cells]
+            if any(cells):
+                rows.append(" | ".join(cells))
+        if rows:
+            blocks.append("\n".join(rows))
 
-    return "\n\n".join(lines).strip()
+    return "\n\n".join(blocks).strip()
 
 
 def _extract_pptx_text(file_path: Path) -> str:
     presentation = Presentation(file_path)
     slides: list[str] = []
-
     for index, slide in enumerate(presentation.slides, start=1):
-        parts: list[str] = [f"Slide {index}"]
+        parts = [f"<!-- slide: {index} -->", f"## Slide {index}"]
         for shape in slide.shapes:
-            text = getattr(shape, "text", "")
-            text = text.strip()
+            text = _clean_extracted_text(getattr(shape, "text", ""))
             if text:
                 parts.append(text)
-        if len(parts) > 1:
+        if len(parts) > 2:
             slides.append("\n\n".join(parts))
-
     return "\n\n".join(slides).strip()

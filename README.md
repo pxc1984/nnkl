@@ -96,4 +96,3 @@ REFRESH_TOKEN_TTL=720h
 ```env
 API_URL=
 ```
-

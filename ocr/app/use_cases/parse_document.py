@@ -9,6 +9,7 @@ import zipfile
 from io import BytesIO
 from pathlib import Path
 
+import structlog
 from sqlalchemy.orm import Session
 
 from app.api.schemas import ParseRequest, TaskStatus
@@ -20,6 +21,8 @@ from app.use_cases.document_extractor import (
     should_use_native_pdf_text,
 )
 
+
+logger = structlog.get_logger(__name__)
 
 class InputBlobNotFoundError(Exception):
     """Raised when the requested shared input blob does not exist."""
@@ -77,6 +80,8 @@ def parse_document(
             settings=settings,
         )
 
+        content = f"<!-- source: {blob.filename} -->\n\n{content.strip()}"
+
         result = job.result
         if result is None:
             result = ParseResult(
@@ -122,7 +127,18 @@ def _parse_input_document(
     settings: Settings,
 ) -> tuple[str, Path | None]:
     if input_path.suffix.lower() == ".pdf":
-        if should_use_native_pdf_text(input_path):
+        use_native = should_use_native_pdf_text(
+            input_path,
+            min_chars=settings.ocr_native_min_characters,
+            minimum_usable_ratio=settings.ocr_native_minimum_usable_page_ratio,
+        )
+        logger.info(
+            "document_extraction.route_selected",
+            path=str(input_path),
+            route="native" if use_native else "mineru",
+            correlation_id=correlation_id,
+        )
+        if use_native:
             return extract_native_document_text(input_path), None
 
         ocr_service = get_ocr_service(
@@ -130,18 +146,30 @@ def _parse_input_document(
             use_gpu=settings.ocr_mineru_use_gpu,
             backend=settings.ocr_mineru_backend,
             document_timeout=settings.ocr_mineru_document_timeout_seconds,
+            preprocess_scans=settings.ocr_mineru_preprocess_scans,
+            scan_dpi=settings.ocr_mineru_scan_dpi,
+            max_page_megapixels=settings.ocr_mineru_max_page_megapixels,
         )
+
+        def report_progress(percent: int, stage: str) -> None:
+            logger.info(
+                "document_extraction.progress",
+                percent=percent,
+                stage=stage,
+                correlation_id=correlation_id,
+            )
+
         return ocr_service.convert(
             input_path,
             language=language,
             correlation_id=correlation_id,
             results_dir=results_dir,
             needs_ocr=True,
+            progress_callback=report_progress,
         )
 
     content = extract_native_document_text(input_path)
     return content, None
-
 
 def _pack_assets(image_dir: Path | None) -> bytes | None:
     if image_dir is None or not image_dir.exists() or not any(image_dir.iterdir()):

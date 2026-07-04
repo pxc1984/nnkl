@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -25,9 +26,14 @@ class Settings(BaseSettings):
     postgres_password: str = "admin"
     postgres_db: str = "db"
     postgres_ssl_mode: str = "disable"
+    database_url_override: str | None = Field(
+        default=None, validation_alias="DATABASE_URL", exclude=True
+    )
 
     @property
     def database_url(self) -> str:
+        if self.database_url_override:
+            return self.database_url_override
         return (
             f"postgresql+psycopg://{self.postgres_user}:{self.postgres_password}"
             f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
@@ -40,6 +46,11 @@ class Settings(BaseSettings):
     ocr_mineru_use_gpu: bool = False
     ocr_mineru_backend: str = "pipeline"
     ocr_mineru_document_timeout_seconds: float = 1800.0
+    ocr_mineru_preprocess_scans: bool = True
+    ocr_mineru_scan_dpi: int = 220
+    ocr_mineru_max_page_megapixels: float = 12.0
+    ocr_native_min_characters: int = 40
+    ocr_native_minimum_usable_page_ratio: float = 0.95
 
     ocr_api_prefix: str = "/api/v1"
 

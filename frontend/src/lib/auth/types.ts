@@ -17,6 +17,7 @@ export type TokenPair = {
 };
 
 export type AuthSession = TokenPair & {
+  accessTokenAcquiredAt: string;
   user: UserProfile;
 };
 

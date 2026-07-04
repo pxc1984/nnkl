@@ -13,7 +13,7 @@
       <env name="OCR_DOCLING_DO_FORMULA_ENRICHMENT" value="false" />
       <env name="OCR_DOCLING_USE_GPU" value="false" />
       <env name="OCR_LOG_LEVEL" value="INFO" />
-      <env name="OCR_SERVICE_URL" value="http://ocr:8000/api/v1" />
+      <env name="OCR_SERVICE_URL" value="http://localhost:8000/api/v1" />
       <env name="OCR_TEMP_DIR" value="/app/tmp" />
       <env name="PORT" value="8080" />
       <env name="POSTGRES_DB" value="db" />

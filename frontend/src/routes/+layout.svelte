@@ -11,6 +11,7 @@
 
 	let checkingAuth = $state(false);
 	let guardRun = 0;
+	let hasBeenAuthenticated = $state(false);
 
 	function isAuthRoute(pathname: string): boolean {
 		return pathname.startsWith("/auth");
@@ -28,7 +29,12 @@
 		}
 
 		const currentRun = ++guardRun;
-		checkingAuth = true;
+
+		// Only block rendering on the initial auth check.
+		// Once authenticated, verify in the background without unmounting children.
+		if (!hasBeenAuthenticated) {
+			checkingAuth = true;
+		}
 
 		const isAuthenticated = await ensureAuthenticated();
 		if (currentRun != guardRun) {
@@ -36,7 +42,9 @@
 		}
 
 		checkingAuth = false;
-		if (!isAuthenticated) {
+		if (isAuthenticated) {
+			hasBeenAuthenticated = true;
+		} else {
 			await goto(resolve("/auth/login"));
 		}
 	}

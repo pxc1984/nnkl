@@ -49,16 +49,21 @@
 		navMain: [
 			{
 				title: "Материалы",
-				url: "#",
+				url: "/data",
 				icon: SquareTerminalIcon,
+				isActive: true,
 				items: [
 					{
-						title: "Ваши материалы",
-						url: "#",
+						title: "Поиск",
+						url: "/data/ask",
 					},
 					{
-						title: "Все материалы",
-						url: "#",
+						title: "Ваши материалы",
+						url: "/data",
+					},
+					{
+						title: "Загрузить",
+						url: "/data/upload",
 					},
 				],
 			},

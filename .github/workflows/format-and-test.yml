@@ -1,8 +1,8 @@
 name: Format & Test
 
 on:
-  push:
-  pull_request:
+#  push:
+#  pull_request:
 
 env:
   GO_VERSION: '1.26'

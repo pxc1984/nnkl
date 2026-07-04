@@ -21,6 +21,8 @@
 	import DownloadIcon from "@lucide/svelte/icons/download";
 	import RefreshCwIcon from "@lucide/svelte/icons/refresh-cw";
 
+	const LOADING_SKELETON_DELAY_MS = 150;
+
 	let object = $state<KnowledgeObjectDetails | null>(null);
 	let isLoading = $state(false);
 	let isDownloading = $state(false);
@@ -34,9 +36,15 @@
 			return;
 		}
 
-		isLoading = true;
+		object = null;
+		isLoading = false;
 		errorMessage = "";
 		let cancelled = false;
+		const loadingTimer = window.setTimeout(() => {
+			if (!cancelled) {
+				isLoading = true;
+			}
+		}, LOADING_SKELETON_DELAY_MS);
 
 		getKnowledgeObject(id)
 			.then((response) => {
@@ -50,6 +58,7 @@
 				object = null;
 			})
 			.finally(() => {
+				window.clearTimeout(loadingTimer);
 				if (!cancelled) {
 					isLoading = false;
 				}
@@ -57,6 +66,7 @@
 
 		return () => {
 			cancelled = true;
+			window.clearTimeout(loadingTimer);
 		};
 	});
 

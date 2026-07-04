@@ -14,10 +14,9 @@ import (
 func RegisterDataRoutes(router gin.IRouter) {
 	client := &http.Client{Timeout: 2 * time.Minute}
 	a := &DataAPI{
-		store:    store.GetStore(),
-		ocr:      NewOCRClient(utils.Settings.OCRServiceURL, client),
-		lightrag: NewLightRAGClient(utils.Settings.LightRAGServiceURL, utils.Settings.LightRAGAPIKey, client),
-		maxMB:    utils.Settings.MaxUploadSizeMB,
+		store: store.GetStore(),
+		ocr:   NewOCRClient(utils.Settings.OCRServiceURL, client),
+		maxMB: utils.Settings.MaxUploadSizeMB,
 	}
 
 	protected := router.Group("/data")

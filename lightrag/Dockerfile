@@ -13,13 +13,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --upgrade pip && pip install -r requirements.txt
 
-RUN mkdir -p /app/data/rag_storage /app/data/inputs /app/data/prompts
+RUN mkdir -p /app/rag_storage /app/inputs
 
 EXPOSE 9621
 
 CMD ["lightrag-server", \
      "--host", "0.0.0.0", \
      "--port", "9621", \
-     "--working-dir", "/app/data/rag_storage", \
-     "--input-dir", "/app/data/inputs", \
+     "--working-dir", "/app/rag_storage", \
+     "--input-dir", "/app/inputs", \
      "--workers", "1"]

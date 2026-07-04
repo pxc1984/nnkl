@@ -9,27 +9,33 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/pxc1984/nnkl-backend/store/models"
 	"gorm.io/gorm"
 )
 
 type InMemoryStore struct {
-	mu       sync.RWMutex
-	users    map[string]User
-	byEmail  map[string]string
-	sessions map[string]Session
-	byHash   map[string]string
-	blobs    map[string]Blob
-	uploads  map[string]Upload
+	mu              sync.RWMutex
+	users           map[string]models.User
+	byEmail         map[string]string
+	sessions        map[string]models.Session
+	byHash          map[string]string
+	blobs           map[string]models.Blob
+	uploads         map[string]models.Upload
+	querySessions   map[string]models.QuerySession
+	auditLogs       []models.AuditLog
+	auditLogCounter uint
 }
 
 func NewInMemoryStore() *InMemoryStore {
 	return &InMemoryStore{
-		users:    make(map[string]User),
-		byEmail:  make(map[string]string),
-		sessions: make(map[string]Session),
-		byHash:   make(map[string]string),
-		blobs:    make(map[string]Blob),
-		uploads:  make(map[string]Upload),
+		users:         make(map[string]models.User),
+		byEmail:       make(map[string]string),
+		sessions:      make(map[string]models.Session),
+		byHash:        make(map[string]string),
+		blobs:         make(map[string]models.Blob),
+		uploads:       make(map[string]models.Upload),
+		querySessions: make(map[string]models.QuerySession),
+		auditLogs:     make([]models.AuditLog, 0),
 	}
 }
 
@@ -51,14 +57,14 @@ func (s *InMemoryStore) CountUsers(context.Context) (int64, error) {
 	return int64(len(s.users)), nil
 }
 
-func (s *InMemoryStore) CreateUser(_ context.Context, params CreateUserParams) (*User, error) {
+func (s *InMemoryStore) CreateUser(_ context.Context, params models.CreateUserParams) (*models.User, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if _, exists := s.byEmail[params.Email]; exists {
 		return nil, gorm.ErrDuplicatedKey
 	}
 	now := time.Now().UTC()
-	user := User{
+	user := models.User{
 		ID:            uuid.NewString(),
 		Email:         params.Email,
 		Name:          params.Name,
@@ -73,7 +79,7 @@ func (s *InMemoryStore) CreateUser(_ context.Context, params CreateUserParams) (
 	return cloneUser(user), nil
 }
 
-func (s *InMemoryStore) GetUserByEmail(_ context.Context, email string) (*User, error) {
+func (s *InMemoryStore) GetUserByEmail(_ context.Context, email string) (*models.User, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	userID, ok := s.byEmail[email]
@@ -87,7 +93,7 @@ func (s *InMemoryStore) GetUserByEmail(_ context.Context, email string) (*User, 
 	return cloneUser(user), nil
 }
 
-func (s *InMemoryStore) GetUserByID(_ context.Context, userID string) (*User, error) {
+func (s *InMemoryStore) GetUserByID(_ context.Context, userID string) (*models.User, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	user, ok := s.users[userID]
@@ -110,7 +116,7 @@ func (s *InMemoryStore) UpdateUserLastLogin(_ context.Context, userID string, la
 	return nil
 }
 
-func (s *InMemoryStore) CreateSession(_ context.Context, params CreateSessionParams) (*Session, error) {
+func (s *InMemoryStore) CreateSession(_ context.Context, params models.CreateSessionParams) (*models.Session, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if _, ok := s.users[params.UserID]; !ok {
@@ -120,7 +126,7 @@ func (s *InMemoryStore) CreateSession(_ context.Context, params CreateSessionPar
 		return nil, gorm.ErrDuplicatedKey
 	}
 	now := params.LastUsedAt
-	session := Session{
+	session := models.Session{
 		ID:               uuid.NewString(),
 		UserID:           params.UserID,
 		RefreshTokenHash: params.RefreshTokenHash,
@@ -135,7 +141,7 @@ func (s *InMemoryStore) CreateSession(_ context.Context, params CreateSessionPar
 	return cloneSession(session), nil
 }
 
-func (s *InMemoryStore) GetSessionByID(_ context.Context, sessionID string) (*Session, error) {
+func (s *InMemoryStore) GetSessionByID(_ context.Context, sessionID string) (*models.Session, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	session, ok := s.sessions[sessionID]
@@ -148,7 +154,7 @@ func (s *InMemoryStore) GetSessionByID(_ context.Context, sessionID string) (*Se
 	return cloneSession(session), nil
 }
 
-func (s *InMemoryStore) GetSessionByRefreshTokenHash(_ context.Context, hash string) (*Session, error) {
+func (s *InMemoryStore) GetSessionByRefreshTokenHash(_ context.Context, hash string) (*models.Session, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	sessionID, ok := s.byHash[hash]
@@ -165,7 +171,7 @@ func (s *InMemoryStore) GetSessionByRefreshTokenHash(_ context.Context, hash str
 	return cloneSession(session), nil
 }
 
-func (s *InMemoryStore) UpdateSessionToken(_ context.Context, params UpdateSessionTokenParams) (*Session, error) {
+func (s *InMemoryStore) UpdateSessionToken(_ context.Context, params models.UpdateSessionTokenParams) (*models.Session, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	session, ok := s.sessions[params.SessionID]
@@ -199,10 +205,10 @@ func (s *InMemoryStore) TouchSession(_ context.Context, sessionID string, lastUs
 	return nil
 }
 
-func (s *InMemoryStore) ListUserSessions(_ context.Context, userID string) ([]Session, error) {
+func (s *InMemoryStore) ListUserSessions(_ context.Context, userID string) ([]models.Session, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	sessions := make([]Session, 0)
+	sessions := make([]models.Session, 0)
 	for _, session := range s.sessions {
 		if session.UserID == userID {
 			sessions = append(sessions, session)
@@ -255,11 +261,11 @@ func (s *InMemoryStore) DeleteUserSessions(_ context.Context, userID string) err
 	return nil
 }
 
-func (s *InMemoryStore) CreateBlob(_ context.Context, params CreateBlobParams) (*Blob, error) {
+func (s *InMemoryStore) CreateBlob(_ context.Context, params models.CreateBlobParams) (*models.Blob, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	now := time.Now().UTC()
-	blob := Blob{
+	blob := models.Blob{
 		ID:          uuid.NewString(),
 		Filename:    params.Filename,
 		FileType:    params.FileType,
@@ -274,7 +280,7 @@ func (s *InMemoryStore) CreateBlob(_ context.Context, params CreateBlobParams) (
 	return cloneBlob(blob), nil
 }
 
-func (s *InMemoryStore) GetBlobByID(_ context.Context, id string) (*Blob, error) {
+func (s *InMemoryStore) GetBlobByID(_ context.Context, id string) (*models.Blob, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	blob, ok := s.blobs[id]
@@ -284,7 +290,7 @@ func (s *InMemoryStore) GetBlobByID(_ context.Context, id string) (*Blob, error)
 	return cloneBlob(blob), nil
 }
 
-func (s *InMemoryStore) GetBlobBySHA256(_ context.Context, sha256 string) (*Blob, error) {
+func (s *InMemoryStore) GetBlobBySHA256(_ context.Context, sha256 string) (*models.Blob, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	for _, blob := range s.blobs {
@@ -295,7 +301,7 @@ func (s *InMemoryStore) GetBlobBySHA256(_ context.Context, sha256 string) (*Blob
 	return nil, gorm.ErrRecordNotFound
 }
 
-func (s *InMemoryStore) CreateUpload(_ context.Context, params CreateUploadParams) (*Upload, error) {
+func (s *InMemoryStore) CreateUpload(_ context.Context, params models.CreateUploadParams) (*models.Upload, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if _, ok := s.blobs[params.InputBlobID]; !ok {
@@ -306,7 +312,7 @@ func (s *InMemoryStore) CreateUpload(_ context.Context, params CreateUploadParam
 	if uploadID == "" {
 		uploadID = uuid.NewString()
 	}
-	upload := Upload{
+	upload := models.Upload{
 		ID:          uploadID,
 		InputBlobID: params.InputBlobID,
 		Status:      params.Status,
@@ -320,11 +326,11 @@ func (s *InMemoryStore) CreateUpload(_ context.Context, params CreateUploadParam
 	return cloneUpload(upload), nil
 }
 
-func (s *InMemoryStore) ListUploads(_ context.Context, params ListUploadsParams) ([]Upload, int64, error) {
+func (s *InMemoryStore) ListUploads(_ context.Context, params models.ListUploadsParams) ([]models.Upload, int64, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	filtered := make([]Upload, 0)
+	filtered := make([]models.Upload, 0)
 	for _, upload := range s.uploads {
 		blob, ok := s.blobs[upload.InputBlobID]
 		if !ok {
@@ -345,7 +351,7 @@ func (s *InMemoryStore) ListUploads(_ context.Context, params ListUploadsParams)
 		filtered = append(filtered, upload)
 	}
 
-	slices.SortFunc(filtered, func(a, b Upload) int {
+	slices.SortFunc(filtered, func(a, b models.Upload) int {
 		return b.CreatedAt.Compare(a.CreatedAt)
 	})
 
@@ -362,21 +368,21 @@ func (s *InMemoryStore) ListUploads(_ context.Context, params ListUploadsParams)
 	}
 	start := (page - 1) * pageSize
 	if start >= len(filtered) {
-		return []Upload{}, int64(len(filtered)), nil
+		return []models.Upload{}, int64(len(filtered)), nil
 	}
 	end := start + pageSize
 	if end > len(filtered) {
 		end = len(filtered)
 	}
 
-	items := make([]Upload, 0, end-start)
+	items := make([]models.Upload, 0, end-start)
 	for _, upload := range filtered[start:end] {
 		items = append(items, *cloneUpload(upload))
 	}
 	return items, int64(len(filtered)), nil
 }
 
-func (s *InMemoryStore) GetUploadByID(_ context.Context, id string) (*Upload, error) {
+func (s *InMemoryStore) GetUploadByID(_ context.Context, id string) (*models.Upload, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	upload, ok := s.uploads[id]
@@ -396,7 +402,7 @@ func (s *InMemoryStore) GetUploadByID(_ context.Context, id string) (*Upload, er
 	return cloneUpload(upload), nil
 }
 
-func (s *InMemoryStore) UpdateUpload(_ context.Context, id string, params UpdateUploadParams) (*Upload, error) {
+func (s *InMemoryStore) UpdateUpload(_ context.Context, id string, params models.UpdateUploadParams) (*models.Upload, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	upload, ok := s.uploads[id]
@@ -438,28 +444,113 @@ func (s *InMemoryStore) DeleteUploadByID(_ context.Context, id string) error {
 	return nil
 }
 
-func cloneUser(user User) *User {
+func (s *InMemoryStore) CreateAuditLog(_ context.Context, entry *models.AuditLog) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.auditLogCounter++
+	entry.ID = s.auditLogCounter
+	entry.Timedate = entry.Timedate.UTC()
+	entry.CreatedAt = time.Now().UTC()
+	s.auditLogs = append(s.auditLogs, *entry)
+	return nil
+}
+
+func (s *InMemoryStore) CreateQuerySession(_ context.Context, params models.CreateQuerySessionParams) (*models.QuerySession, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	now := time.Now().UTC()
+	session := models.QuerySession{
+		ID:         uuid.NewString(),
+		UserID:     params.UserID,
+		Query:      params.Query,
+		Mode:       params.Mode,
+		Response:   params.Response,
+		References: params.References,
+		CreatedAt:  now,
+	}
+	s.querySessions[session.ID] = session
+	return cloneQuerySession(session), nil
+}
+
+func (s *InMemoryStore) GetQuerySessionByID(_ context.Context, id string) (*models.QuerySession, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	session, ok := s.querySessions[id]
+	if !ok {
+		return nil, gorm.ErrRecordNotFound
+	}
+	return cloneQuerySession(session), nil
+}
+
+func (s *InMemoryStore) ListQuerySessions(_ context.Context, userID string, params models.ListQuerySessionsParams) ([]models.QuerySession, int64, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	filtered := make([]models.QuerySession, 0)
+	for _, session := range s.querySessions {
+		if session.UserID == userID {
+			filtered = append(filtered, session)
+		}
+	}
+
+	slices.SortFunc(filtered, func(a, b models.QuerySession) int {
+		return b.CreatedAt.Compare(a.CreatedAt)
+	})
+
+	page := params.Page
+	if page <= 0 {
+		page = 1
+	}
+	pageSize := params.PageSize
+	if pageSize <= 0 {
+		pageSize = 20
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
+	total := int64(len(filtered))
+	start := (page - 1) * pageSize
+	if start >= len(filtered) {
+		return []models.QuerySession{}, total, nil
+	}
+	end := start + pageSize
+	if end > len(filtered) {
+		end = len(filtered)
+	}
+	items := make([]models.QuerySession, 0, end-start)
+	for _, session := range filtered[start:end] {
+		items = append(items, *cloneQuerySession(session))
+	}
+	return items, total, nil
+}
+
+func cloneUser(user models.User) *models.User {
 	clone := user
 	return &clone
 }
 
-func cloneSession(session Session) *Session {
+func cloneSession(session models.Session) *models.Session {
 	clone := session
 	return &clone
 }
 
-func cloneBlob(blob Blob) *Blob {
+func cloneBlob(blob models.Blob) *models.Blob {
 	clone := blob
 	clone.Content = append([]byte(nil), blob.Content...)
 	return &clone
 }
 
-func cloneUpload(upload Upload) *Upload {
+func cloneUpload(upload models.Upload) *models.Upload {
 	clone := upload
 	clone.InputBlob = *cloneBlob(upload.InputBlob)
 	if upload.OutputBlob != nil {
 		clone.OutputBlob = cloneBlob(*upload.OutputBlob)
 	}
+	return &clone
+}
+
+func cloneQuerySession(session models.QuerySession) *models.QuerySession {
+	clone := session
 	return &clone
 }
 

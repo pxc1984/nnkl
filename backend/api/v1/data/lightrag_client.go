@@ -36,7 +36,8 @@ type LightRAGQueryRequest struct {
 	EnableRerank      bool   `json:"enable_rerank"`
 }
 type LightRAGQueryResponse struct {
-	Response string `json:"response"`
+	Response   string          `json:"response"`
+	References json.RawMessage `json:"references,omitempty"`
 }
 
 func NewLightRAGClient(baseURL, apiKey string, client *http.Client) *LightRAGClient {
@@ -76,7 +77,7 @@ func (c *LightRAGClient) Query(ctx context.Context, query, mode string) (*LightR
 	if mode == "" {
 		mode = "naive"
 	}
-	body, err := json.Marshal(LightRAGQueryRequest{Query: query, Mode: mode})
+	body, err := json.Marshal(LightRAGQueryRequest{Query: query, Mode: mode, IncludeReferences: true})
 	if err != nil {
 		return nil, fmt.Errorf("marshal lightrag query request: %w", err)
 	}

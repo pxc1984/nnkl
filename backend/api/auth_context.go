@@ -3,7 +3,7 @@ package api
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/pxc1984/nnkl-backend/auth"
-	"github.com/pxc1984/nnkl-backend/store"
+	"github.com/pxc1984/nnkl-backend/store/models"
 )
 
 const (
@@ -11,17 +11,17 @@ const (
 	authClaimsContextKey  = "authClaims"
 )
 
-func SetAuthenticatedRequest(c *gin.Context, claims *auth.AccessClaims, user *store.User) {
+func SetAuthenticatedRequest(c *gin.Context, claims *auth.AccessClaims, user *models.User) {
 	c.Set(authClaimsContextKey, claims)
 	c.Set(currentUserContextKey, user)
 }
 
-func CurrentUserFromContext(c *gin.Context) (*store.User, bool) {
+func CurrentUserFromContext(c *gin.Context) (*models.User, bool) {
 	user, ok := c.Get(currentUserContextKey)
 	if !ok {
 		return nil, false
 	}
-	typedUser, ok := user.(*store.User)
+	typedUser, ok := user.(*models.User)
 	return typedUser, ok
 }
 

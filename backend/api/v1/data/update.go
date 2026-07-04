@@ -6,7 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/pxc1984/nnkl-backend/api"
 	shared "github.com/pxc1984/nnkl-backend/api/v1/shared"
-	"github.com/pxc1984/nnkl-backend/store"
+	"github.com/pxc1984/nnkl-backend/store/models"
 )
 
 func (a *DataAPI) update(c *gin.Context) {
@@ -52,7 +52,7 @@ func (a *DataAPI) update(c *gin.Context) {
 			}
 			blob, err := a.store.GetBlobBySHA256(c.Request.Context(), sha)
 			if err != nil {
-				blob, err = a.store.CreateBlob(c.Request.Context(), store.CreateBlobParams{
+				blob, err = a.store.CreateBlob(c.Request.Context(), models.CreateBlobParams{
 					Filename:    fileHeader.Filename,
 					FileType:    newBlobType,
 					ContentType: contentType,
@@ -73,7 +73,7 @@ func (a *DataAPI) update(c *gin.Context) {
 				status = "completed"
 				outputBlobID = &inputBlobID
 			}
-			upload, err := a.store.UpdateUpload(c.Request.Context(), current.ID, store.UpdateUploadParams{
+			upload, err := a.store.UpdateUpload(c.Request.Context(), current.ID, models.UpdateUploadParams{
 				InputBlobID:  &inputBlobID,
 				OutputBlobID: outputBlobID,
 				Status:       &status,

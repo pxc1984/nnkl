@@ -7,7 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/pxc1984/nnkl-backend/api"
 	auth2 "github.com/pxc1984/nnkl-backend/auth"
-	"github.com/pxc1984/nnkl-backend/store"
+	"github.com/pxc1984/nnkl-backend/store/models"
 )
 
 func (a *AuthAPI) refresh(c *gin.Context) {
@@ -29,7 +29,7 @@ func (a *AuthAPI) refresh(c *gin.Context) {
 		api.RespondError(c, http.StatusInternalServerError, "failed to issue tokens", "internal_error")
 		return
 	}
-	session, err = a.store.UpdateSessionToken(c.Request.Context(), store.UpdateSessionTokenParams{
+	session, err = a.store.UpdateSessionToken(c.Request.Context(), models.UpdateSessionTokenParams{
 		SessionID:        session.ID,
 		RefreshTokenHash: refreshHash,
 		ExpiresAt:        a.tokens.RefreshTokenExpiry(now),

@@ -16,7 +16,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/pxc1984/nnkl-backend/api"
-	"github.com/pxc1984/nnkl-backend/store"
+	"github.com/pxc1984/nnkl-backend/store/models"
 	"gorm.io/gorm"
 )
 
@@ -29,7 +29,7 @@ func (a *DataAPI) reprocessBlob(c *gin.Context, blobID, outputFormat, language s
 	if isMarkdownBlob(&upload.InputBlob) {
 		status := "completed"
 		outputBlobID := upload.InputBlobID
-		if _, err := a.store.UpdateUpload(c.Request.Context(), upload.ID, store.UpdateUploadParams{
+		if _, err := a.store.UpdateUpload(c.Request.Context(), upload.ID, models.UpdateUploadParams{
 			OutputBlobID: &outputBlobID,
 			Status:       &status,
 			Language:     &language,
@@ -77,7 +77,7 @@ func (a *DataAPI) sendToLightRAG(c *gin.Context, blobID, outputFormat string) {
 	slog.Info("lightrag: text indexed", "blob_id", blobID, "source", source)
 }
 
-func (a *DataAPI) persistFile(c *gin.Context, fileHeader *multipart.FileHeader, fileType string, tags []string) (*store.Blob, error) {
+func (a *DataAPI) persistFile(c *gin.Context, fileHeader *multipart.FileHeader, fileType string, tags []string) (*models.Blob, error) {
 	content, contentType, sha, err := readMultipartFile(fileHeader)
 	if err != nil {
 		return nil, err
@@ -86,7 +86,7 @@ func (a *DataAPI) persistFile(c *gin.Context, fileHeader *multipart.FileHeader, 
 		return existing, nil
 	}
 
-	return a.store.CreateBlob(c.Request.Context(), store.CreateBlobParams{
+	return a.store.CreateBlob(c.Request.Context(), models.CreateBlobParams{
 		Filename:    fileHeader.Filename,
 		FileType:    fileType,
 		ContentType: contentType,
@@ -185,7 +185,7 @@ func detectSupportedFileType(filename string) string {
 	}
 }
 
-func isMarkdownBlob(blob *store.Blob) bool {
+func isMarkdownBlob(blob *models.Blob) bool {
 	return blob != nil && blob.FileType == "markdown"
 }
 

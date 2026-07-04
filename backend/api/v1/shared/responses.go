@@ -3,7 +3,7 @@ package shared
 import (
 	"time"
 
-	"github.com/pxc1984/nnkl-backend/store"
+	"github.com/pxc1984/nnkl-backend/store/models"
 )
 
 type UserResponse struct {
@@ -26,7 +26,7 @@ type SessionResponse struct {
 	LastUsedAt time.Time `json:"lastUsedAt"`
 }
 
-func ToUserResponse(user *store.User) UserResponse {
+func ToUserResponse(user *models.User) UserResponse {
 	return UserResponse{
 		ID:            user.ID,
 		Email:         user.Email,
@@ -40,7 +40,7 @@ func ToUserResponse(user *store.User) UserResponse {
 	}
 }
 
-func ToSessionResponses(sessions []store.Session) []SessionResponse {
+func ToSessionResponses(sessions []models.Session) []SessionResponse {
 	response := make([]SessionResponse, 0, len(sessions))
 	for _, session := range sessions {
 		response = append(response, SessionResponse{

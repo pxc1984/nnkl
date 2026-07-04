@@ -3,7 +3,7 @@ package shared
 import (
 	"time"
 
-	"github.com/pxc1984/nnkl-backend/store"
+	"github.com/pxc1984/nnkl-backend/store/models"
 )
 
 type KnowledgeObjectResponse struct {
@@ -44,7 +44,7 @@ type PaginatedKnowledgeObjectList struct {
 	Meta  PaginationMeta            `json:"meta"`
 }
 
-func ToKnowledgeObjectResponse(blob *store.Blob) KnowledgeObjectResponse {
+func ToKnowledgeObjectResponse(blob *models.Blob) KnowledgeObjectResponse {
 	return KnowledgeObjectResponse{
 		ID:          blob.ID,
 		Filename:    blob.Filename,
@@ -57,7 +57,7 @@ func ToKnowledgeObjectResponse(blob *store.Blob) KnowledgeObjectResponse {
 	}
 }
 
-func ToKnowledgeObjectResponses(blobs []store.Blob) []KnowledgeObjectResponse {
+func ToKnowledgeObjectResponses(blobs []models.Blob) []KnowledgeObjectResponse {
 	response := make([]KnowledgeObjectResponse, 0, len(blobs))
 	for i := range blobs {
 		response = append(response, ToKnowledgeObjectResponse(&blobs[i]))

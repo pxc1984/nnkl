@@ -39,9 +39,11 @@ func main() {
 
 	router := gin.Default()
 
-	apiv1.RegisterRoutes(router.Group("/api/v1"))
+	v1 := router.Group("/api/v1")
+	v1.Use(api.AuditMiddleware())
+	apiv1.RegisterRoutes(v1)
 
-	router.GET("/api/health", api.HealthCheck)
+	router.GET("/api/health", api.AuditMiddleware(), api.HealthCheck)
 
 	addr := fmt.Sprintf("%s:%d", utils.Settings.Host, utils.Settings.Port)
 	slog.Info("listening", "addr", addr)

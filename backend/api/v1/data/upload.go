@@ -7,7 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/pxc1984/nnkl-backend/api"
-	"github.com/pxc1984/nnkl-backend/store"
+	"github.com/pxc1984/nnkl-backend/store/models"
 	"gorm.io/gorm"
 )
 
@@ -47,7 +47,7 @@ func (a *DataAPI) upload(c *gin.Context) {
 			return
 		}
 
-		upload, err := a.store.CreateUpload(c.Request.Context(), store.CreateUploadParams{
+		upload, err := a.store.CreateUpload(c.Request.Context(), models.CreateUploadParams{
 			ID:          blob.ID,
 			InputBlobID: blob.ID,
 			Status:      "pending",

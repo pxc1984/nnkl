@@ -7,7 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/pxc1984/nnkl-backend/api"
 	shared "github.com/pxc1984/nnkl-backend/api/v1/shared"
-	"github.com/pxc1984/nnkl-backend/store"
+	"github.com/pxc1984/nnkl-backend/store/models"
 )
 
 func (a *DataAPI) list(c *gin.Context) {
@@ -15,7 +15,7 @@ func (a *DataAPI) list(c *gin.Context) {
 	pageSize := parsePositiveInt(c.DefaultQuery("pageSize", "20"), 20)
 	tags := trimNonEmpty(c.QueryArray("tags"))
 
-	uploads, total, err := a.store.ListUploads(c.Request.Context(), store.ListUploadsParams{
+	uploads, total, err := a.store.ListUploads(c.Request.Context(), models.ListUploadsParams{
 		Page:     page,
 		PageSize: pageSize,
 		Query:    strings.TrimSpace(c.Query("query")),
@@ -35,7 +35,7 @@ func (a *DataAPI) list(c *gin.Context) {
 		totalPages = 1
 	}
 
-	blobs := make([]store.Blob, 0, len(uploads))
+	blobs := make([]models.Blob, 0, len(uploads))
 	for i := range uploads {
 		blobs = append(blobs, uploads[i].InputBlob)
 	}

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/pxc1984/nnkl-backend/store/models"
 
 	"github.com/pxc1984/nnkl-backend/utils"
 	"gorm.io/driver/postgres"
@@ -41,7 +42,7 @@ func NewPostgresStore() (*PostgresStore, error) {
 	}
 
 	store := &PostgresStore{db: db, sqldb: sqldb}
-	if err := store.db.AutoMigrate(&User{}, &Session{}, &Blob{}, &Upload{}); err != nil {
+	if err := store.db.AutoMigrate(&models.User{}, &models.Session{}, &models.Blob{}, &models.Upload{}, &models.AuditLog{}, &models.QuerySession{}); err != nil {
 		_ = sqldb.Close()
 		return nil, fmt.Errorf("migrate postgres schema: %w", err)
 	}
@@ -71,12 +72,12 @@ func (s *PostgresStore) Close() error {
 
 func (s *PostgresStore) CountUsers(ctx context.Context) (int64, error) {
 	var count int64
-	err := s.db.WithContext(ctx).Model(&User{}).Count(&count).Error
+	err := s.db.WithContext(ctx).Model(&models.User{}).Count(&count).Error
 	return count, err
 }
 
-func (s *PostgresStore) CreateUser(ctx context.Context, params CreateUserParams) (*User, error) {
-	user := &User{
+func (s *PostgresStore) CreateUser(ctx context.Context, params models.CreateUserParams) (*models.User, error) {
+	user := &models.User{
 		ID:            uuid.NewString(),
 		Email:         params.Email,
 		Name:          params.Name,
@@ -90,16 +91,16 @@ func (s *PostgresStore) CreateUser(ctx context.Context, params CreateUserParams)
 	return user, nil
 }
 
-func (s *PostgresStore) GetUserByEmail(ctx context.Context, email string) (*User, error) {
-	var user User
+func (s *PostgresStore) GetUserByEmail(ctx context.Context, email string) (*models.User, error) {
+	var user models.User
 	if err := s.db.WithContext(ctx).Where("email = ?", email).First(&user).Error; err != nil {
 		return nil, err
 	}
 	return &user, nil
 }
 
-func (s *PostgresStore) GetUserByID(ctx context.Context, userID string) (*User, error) {
-	var user User
+func (s *PostgresStore) GetUserByID(ctx context.Context, userID string) (*models.User, error) {
+	var user models.User
 	if err := s.db.WithContext(ctx).First(&user, "id = ?", userID).Error; err != nil {
 		return nil, err
 	}
@@ -108,13 +109,13 @@ func (s *PostgresStore) GetUserByID(ctx context.Context, userID string) (*User, 
 
 func (s *PostgresStore) UpdateUserLastLogin(ctx context.Context, userID string, lastLoginAt time.Time) error {
 	return s.db.WithContext(ctx).
-		Model(&User{}).
+		Model(&models.User{}).
 		Where("id = ?", userID).
 		Updates(map[string]any{"last_login_at": lastLoginAt, "updated_at": lastLoginAt}).Error
 }
 
-func (s *PostgresStore) CreateSession(ctx context.Context, params CreateSessionParams) (*Session, error) {
-	session := &Session{
+func (s *PostgresStore) CreateSession(ctx context.Context, params models.CreateSessionParams) (*models.Session, error) {
+	session := &models.Session{
 		ID:               uuid.NewString(),
 		UserID:           params.UserID,
 		RefreshTokenHash: params.RefreshTokenHash,
@@ -129,25 +130,25 @@ func (s *PostgresStore) CreateSession(ctx context.Context, params CreateSessionP
 	return session, nil
 }
 
-func (s *PostgresStore) GetSessionByID(ctx context.Context, sessionID string) (*Session, error) {
-	var session Session
+func (s *PostgresStore) GetSessionByID(ctx context.Context, sessionID string) (*models.Session, error) {
+	var session models.Session
 	if err := s.db.WithContext(ctx).Preload("User").First(&session, "id = ?", sessionID).Error; err != nil {
 		return nil, err
 	}
 	return &session, nil
 }
 
-func (s *PostgresStore) GetSessionByRefreshTokenHash(ctx context.Context, hash string) (*Session, error) {
-	var session Session
+func (s *PostgresStore) GetSessionByRefreshTokenHash(ctx context.Context, hash string) (*models.Session, error) {
+	var session models.Session
 	if err := s.db.WithContext(ctx).Preload("User").Where("refresh_token_hash = ?", hash).First(&session).Error; err != nil {
 		return nil, err
 	}
 	return &session, nil
 }
 
-func (s *PostgresStore) UpdateSessionToken(ctx context.Context, params UpdateSessionTokenParams) (*Session, error) {
+func (s *PostgresStore) UpdateSessionToken(ctx context.Context, params models.UpdateSessionTokenParams) (*models.Session, error) {
 	if err := s.db.WithContext(ctx).
-		Model(&Session{}).
+		Model(&models.Session{}).
 		Where("id = ?", params.SessionID).
 		Updates(map[string]any{
 			"refresh_token_hash": params.RefreshTokenHash,
@@ -161,31 +162,31 @@ func (s *PostgresStore) UpdateSessionToken(ctx context.Context, params UpdateSes
 
 func (s *PostgresStore) TouchSession(ctx context.Context, sessionID string, lastUsedAt time.Time) error {
 	return s.db.WithContext(ctx).
-		Model(&Session{}).
+		Model(&models.Session{}).
 		Where("id = ?", sessionID).
 		Update("last_used_at", lastUsedAt).Error
 }
 
-func (s *PostgresStore) ListUserSessions(ctx context.Context, userID string) ([]Session, error) {
-	var sessions []Session
+func (s *PostgresStore) ListUserSessions(ctx context.Context, userID string) ([]models.Session, error) {
+	var sessions []models.Session
 	err := s.db.WithContext(ctx).Where("user_id = ?", userID).Order("created_at desc").Find(&sessions).Error
 	return sessions, err
 }
 
 func (s *PostgresStore) DeleteSessionByID(ctx context.Context, sessionID string) error {
-	return s.db.WithContext(ctx).Delete(&Session{}, "id = ?", sessionID).Error
+	return s.db.WithContext(ctx).Delete(&models.Session{}, "id = ?", sessionID).Error
 }
 
 func (s *PostgresStore) DeleteSessionByUserAndHash(ctx context.Context, userID, hash string) error {
-	return s.db.WithContext(ctx).Delete(&Session{}, "user_id = ? AND refresh_token_hash = ?", userID, hash).Error
+	return s.db.WithContext(ctx).Delete(&models.Session{}, "user_id = ? AND refresh_token_hash = ?", userID, hash).Error
 }
 
 func (s *PostgresStore) DeleteUserSessions(ctx context.Context, userID string) error {
-	return s.db.WithContext(ctx).Delete(&Session{}, "user_id = ?", userID).Error
+	return s.db.WithContext(ctx).Delete(&models.Session{}, "user_id = ?", userID).Error
 }
 
-func (s *PostgresStore) CreateBlob(ctx context.Context, params CreateBlobParams) (*Blob, error) {
-	blob := &Blob{
+func (s *PostgresStore) CreateBlob(ctx context.Context, params models.CreateBlobParams) (*models.Blob, error) {
+	blob := &models.Blob{
 		ID:          uuid.NewString(),
 		Filename:    params.Filename,
 		FileType:    strings.ToLower(params.FileType),
@@ -200,24 +201,24 @@ func (s *PostgresStore) CreateBlob(ctx context.Context, params CreateBlobParams)
 	return blob, nil
 }
 
-func (s *PostgresStore) GetBlobByID(ctx context.Context, id string) (*Blob, error) {
-	var blob Blob
+func (s *PostgresStore) GetBlobByID(ctx context.Context, id string) (*models.Blob, error) {
+	var blob models.Blob
 	if err := s.db.WithContext(ctx).First(&blob, "id = ?", id).Error; err != nil {
 		return nil, err
 	}
 	return &blob, nil
 }
 
-func (s *PostgresStore) GetBlobBySHA256(ctx context.Context, sha256 string) (*Blob, error) {
-	var blob Blob
+func (s *PostgresStore) GetBlobBySHA256(ctx context.Context, sha256 string) (*models.Blob, error) {
+	var blob models.Blob
 	if err := s.db.WithContext(ctx).Where("sha256 = ?", sha256).First(&blob).Error; err != nil {
 		return nil, err
 	}
 	return &blob, nil
 }
 
-func (s *PostgresStore) CreateUpload(ctx context.Context, params CreateUploadParams) (*Upload, error) {
-	upload := &Upload{
+func (s *PostgresStore) CreateUpload(ctx context.Context, params models.CreateUploadParams) (*models.Upload, error) {
+	upload := &models.Upload{
 		ID:          params.ID,
 		InputBlobID: params.InputBlobID,
 		Status:      params.Status,
@@ -233,7 +234,7 @@ func (s *PostgresStore) CreateUpload(ctx context.Context, params CreateUploadPar
 	return s.GetUploadByID(ctx, upload.ID)
 }
 
-func (s *PostgresStore) ListUploads(ctx context.Context, params ListUploadsParams) ([]Upload, int64, error) {
+func (s *PostgresStore) ListUploads(ctx context.Context, params models.ListUploadsParams) ([]models.Upload, int64, error) {
 	page := max(params.Page, 1)
 	pageSize := params.PageSize
 	if pageSize <= 0 {
@@ -243,7 +244,7 @@ func (s *PostgresStore) ListUploads(ctx context.Context, params ListUploadsParam
 		pageSize = 100
 	}
 
-	query := s.db.WithContext(ctx).Model(&Upload{}).Joins("InputBlob")
+	query := s.db.WithContext(ctx).Model(&models.Upload{}).Joins("InputBlob")
 	if params.Query != "" {
 		query = query.Where("InputBlob.filename ILIKE ?", "%"+params.Query+"%")
 	}
@@ -256,20 +257,20 @@ func (s *PostgresStore) ListUploads(ctx context.Context, params ListUploadsParam
 		return nil, 0, err
 	}
 
-	var uploads []Upload
+	var uploads []models.Upload
 	err := query.Preload("InputBlob").Preload("OutputBlob").Order("uploads.created_at desc").Offset((page - 1) * pageSize).Limit(pageSize).Find(&uploads).Error
 	return uploads, total, err
 }
 
-func (s *PostgresStore) GetUploadByID(ctx context.Context, id string) (*Upload, error) {
-	var upload Upload
+func (s *PostgresStore) GetUploadByID(ctx context.Context, id string) (*models.Upload, error) {
+	var upload models.Upload
 	if err := s.db.WithContext(ctx).Preload("InputBlob").Preload("OutputBlob").First(&upload, "id = ?", id).Error; err != nil {
 		return nil, err
 	}
 	return &upload, nil
 }
 
-func (s *PostgresStore) UpdateUpload(ctx context.Context, id string, params UpdateUploadParams) (*Upload, error) {
+func (s *PostgresStore) UpdateUpload(ctx context.Context, id string, params models.UpdateUploadParams) (*models.Upload, error) {
 	updates := map[string]any{}
 	if params.InputBlobID != nil {
 		updates["input_blob"] = *params.InputBlobID
@@ -286,7 +287,7 @@ func (s *PostgresStore) UpdateUpload(ctx context.Context, id string, params Upda
 	if params.Error != nil {
 		updates["error"] = *params.Error
 	}
-	if err := s.db.WithContext(ctx).Model(&Upload{}).Where("id = ?", id).Updates(updates).Error; err != nil {
+	if err := s.db.WithContext(ctx).Model(&models.Upload{}).Where("id = ?", id).Updates(updates).Error; err != nil {
 		return nil, err
 	}
 	return s.GetUploadByID(ctx, id)
@@ -294,11 +295,11 @@ func (s *PostgresStore) UpdateUpload(ctx context.Context, id string, params Upda
 
 func (s *PostgresStore) DeleteUploadByID(ctx context.Context, id string) error {
 	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var upload Upload
+		var upload models.Upload
 		if err := tx.First(&upload, "id = ?", id).Error; err != nil {
 			return err
 		}
-		if err := tx.Delete(&Upload{}, "id = ?", id).Error; err != nil {
+		if err := tx.Delete(&models.Upload{}, "id = ?", id).Error; err != nil {
 			return err
 		}
 		if err := deleteBlobIfUnreferenced(tx, upload.InputBlobID); err != nil {
@@ -318,13 +319,13 @@ func deleteBlobIfUnreferenced(tx *gorm.DB, blobID string) error {
 		return nil
 	}
 	var count int64
-	if err := tx.Model(&Upload{}).Where("input_blob = ? OR output_blob = ?", blobID, blobID).Count(&count).Error; err != nil {
+	if err := tx.Model(&models.Upload{}).Where("input_blob = ? OR output_blob = ?", blobID, blobID).Count(&count).Error; err != nil {
 		return err
 	}
 	if count > 0 {
 		return nil
 	}
-	return tx.Delete(&Blob{}, "id = ?", blobID).Error
+	return tx.Delete(&models.Blob{}, "id = ?", blobID).Error
 }
 
 func (s *PostgresStore) migrateLegacyBlobTables(ctx context.Context) error {
@@ -391,4 +392,54 @@ func max(value, fallback int) int {
 		return value
 	}
 	return fallback
+}
+
+func (s *PostgresStore) CreateAuditLog(ctx context.Context, entry *models.AuditLog) error {
+	entry.Timedate = entry.Timedate.UTC()
+	return s.db.WithContext(ctx).Create(entry).Error
+}
+
+func (s *PostgresStore) CreateQuerySession(ctx context.Context, params models.CreateQuerySessionParams) (*models.QuerySession, error) {
+	session := &models.QuerySession{
+		ID:         uuid.NewString(),
+		UserID:     params.UserID,
+		Query:      params.Query,
+		Mode:       params.Mode,
+		Response:   params.Response,
+		References: params.References,
+	}
+	if err := s.db.WithContext(ctx).Create(session).Error; err != nil {
+		return nil, err
+	}
+	return session, nil
+}
+
+func (s *PostgresStore) GetQuerySessionByID(ctx context.Context, id string) (*models.QuerySession, error) {
+	var session models.QuerySession
+	if err := s.db.WithContext(ctx).First(&session, "id = ?", id).Error; err != nil {
+		return nil, err
+	}
+	return &session, nil
+}
+
+func (s *PostgresStore) ListQuerySessions(ctx context.Context, userID string, params models.ListQuerySessionsParams) ([]models.QuerySession, int64, error) {
+	page := max(params.Page, 1)
+	pageSize := params.PageSize
+	if pageSize <= 0 {
+		pageSize = 20
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
+
+	query := s.db.WithContext(ctx).Model(&models.QuerySession{}).Where("user_id = ?", userID)
+
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	var sessions []models.QuerySession
+	err := query.Order("created_at desc").Offset((page - 1) * pageSize).Limit(pageSize).Find(&sessions).Error
+	return sessions, total, err
 }

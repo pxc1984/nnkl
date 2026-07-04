@@ -22,7 +22,23 @@
 - визуализировать подграфы по темам;
 - фильтровать результаты по типам сущностей, географии и источникам.
 
+## Демо
+
+> **TODO:** заменить на GIF-демо работы проекта (загрузка документа → вопрос → ответ с источниками → граф знаний).
+>
+> ```markdown
+> ![Demo](docs/images/demo.gif)
+> ```
+
 ## Архитектура
+
+> **TODO:** заменить на схему архитектуры в виде изображения.
+>
+> ```markdown
+> ![Architecture](docs/images/architecture.png)
+> ```
+
+Текстовая схема:
 
 ```text
 ┌─────────────┐      ┌─────────────┐      ┌─────────────────┐
@@ -107,6 +123,16 @@ pnpm run dev
 ├── docs/             # OpenAPI спецификация (apiv1.yaml)
 └── docker-compose.yml
 ```
+
+## Скриншоты интерфейса
+
+> **TODO:** заменить на реальные скриншоты после финальной стилизации.
+>
+> ```markdown
+> ![Ask page](docs/images/screenshot-ask.png)
+> ![Graph page](docs/images/screenshot-graph.png)
+> ![Data page](docs/images/screenshot-data.png)
+> ```
 
 ## Ключевые возможности
 

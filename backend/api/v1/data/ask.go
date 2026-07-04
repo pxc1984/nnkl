@@ -41,6 +41,7 @@ func (a *DataAPI) ask(c *gin.Context) {
 		Mode:   req.Mode,
 	})
 }
+
 func (a *DataAPI) askStream(c *gin.Context) {
 	var req AskRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

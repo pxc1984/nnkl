@@ -38,6 +38,7 @@ class Settings(BaseSettings):
     ocr_docling_artifacts_path: Path | None = None
     ocr_docling_use_gpu: bool = False
     ocr_docling_do_formula_enrichment: bool = False
+    ocr_docling_document_timeout_seconds: float = 30.0
 
     ocr_api_prefix: str = "/api/v1"
 

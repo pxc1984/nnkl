@@ -9,6 +9,7 @@ from app.services.table_postprocessor import (
     normalize_unit_text,
     postprocess_table_cell,
 )
+from app.use_cases.document_extractor import has_native_pdf_text, sanitize_extracted_text
 
 
 class TestTablePostprocessor:
@@ -28,3 +29,9 @@ class TestScanDetection:
         from app.services.ocr_service import _detect_scan_quality
 
         assert _detect_scan_quality(sample_pdf) is False
+
+    def test_has_native_pdf_text(self, sample_pdf: Path) -> None:
+        assert has_native_pdf_text(sample_pdf) is True
+
+    def test_sanitize_extracted_text_removes_nul_and_controls(self) -> None:
+        assert sanitize_extracted_text("abc\x00def\x1bghi\n\tjkl") == "abcdefghi\n\tjkl"

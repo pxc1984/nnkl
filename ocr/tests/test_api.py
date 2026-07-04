@@ -53,6 +53,60 @@ class TestHealthEndpoint:
 
 class TestParseEndpoint:
     @patch("app.use_cases.parse_document.get_ocr_service")
+    def test_parse_native_pdf_bypasses_docling(self, mock_get_ocr_service, client: TestClient, db_session, sample_pdf: Path) -> None:
+        blob_id = str(uuid.uuid4())
+        _insert_blob(db_session, sample_pdf, blob_id=blob_id)
+
+        response = client.post(
+            "/api/v1/parse",
+            json={
+                "document_id": "doc-native-pdf",
+                "input_blob_id": blob_id,
+                "output_format": "markdown",
+                "language": "auto",
+            },
+        )
+
+        assert response.status_code == 201
+        mock_get_ocr_service.assert_not_called()
+
+        result_response = client.get("/api/v1/result/doc-native-pdf")
+        assert result_response.status_code == 200
+        content = result_response.json()["content_text"]
+        assert "Тестовый материал" in content
+        assert "ГОСТ 19281" in content
+
+    @patch("app.use_cases.parse_document.extract_native_document_text")
+    @patch("app.use_cases.parse_document.get_ocr_service")
+    def test_parse_corrupted_native_pdf_falls_back_to_docling(
+        self,
+        mock_get_ocr_service,
+        mock_extract_native_document_text,
+        client: TestClient,
+        db_session,
+        sample_pdf: Path,
+    ) -> None:
+        blob_id = str(uuid.uuid4())
+        _insert_blob(db_session, sample_pdf, blob_id=blob_id)
+        ocr_service = mock_get_ocr_service.return_value
+        ocr_service.convert.return_value = ("docling fallback", None)
+
+        with patch("app.use_cases.parse_document.should_use_native_pdf_text", return_value=False):
+            response = client.post(
+                "/api/v1/parse",
+                json={
+                    "document_id": "doc-fallback-pdf",
+                    "input_blob_id": blob_id,
+                    "output_format": "markdown",
+                    "language": "auto",
+                },
+            )
+
+        assert response.status_code == 201
+        mock_extract_native_document_text.assert_not_called()
+        ocr_service.convert.assert_called_once()
+
+    @patch("app.use_cases.parse_document.get_ocr_service")
     def test_parse_persists_result(self, mock_get_ocr_service, client: TestClient, db_session, sample_pdf: Path) -> None:
         blob_id = str(uuid.uuid4())
         _insert_blob(db_session, sample_pdf, blob_id=blob_id)

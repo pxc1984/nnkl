@@ -73,5 +73,10 @@ export type DataUploadParams = {
 };
 
 export type DataUploadResponse = {
-  ids: string[];
+  items: Array<{
+    id: string;
+    filename: string;
+    type: string;
+    status: string;
+  }>;
 };

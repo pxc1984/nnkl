@@ -45,16 +45,18 @@ class OCRService:
         artifacts_path: Path | None = None,
         use_gpu: bool = True,
         do_formula_enrichment: bool = True,
+        document_timeout: float = 30.0,
     ) -> None:
         self._artifacts_path = artifacts_path
         self._use_gpu = use_gpu
         self._do_formula_enrichment = do_formula_enrichment
-        self._document_timeout = 1800.0
+        self._document_timeout = document_timeout
         self._converter: DocumentConverter | None = None
         logger.info(
             "ocr_service.initializing",
             use_gpu=use_gpu,
             do_formula_enrichment=do_formula_enrichment,
+            document_timeout=document_timeout,
         )
 
     @property
@@ -105,7 +107,16 @@ class OCRService:
 
     def preprocess_pdf(self, source_path: Path, *, correlation_id: str | None = None) -> Path:
         """Предобработка сканов через PyMuPDF."""
-        needs_enhancement = _detect_scan_quality(source_path)
+        return self.preprocess_pdf_for_ocr(source_path, needs_enhancement=True, correlation_id=correlation_id)
+
+    def preprocess_pdf_for_ocr(
+        self,
+        source_path: Path,
+        *,
+        needs_enhancement: bool,
+        correlation_id: str | None = None,
+    ) -> Path:
+        """Предобработка PDF только когда OCR действительно нужен."""
         if not needs_enhancement:
             logger.info("ocr_service.preprocess_skipped", path=str(source_path))
             return source_path
@@ -136,6 +147,7 @@ class OCRService:
         progress_callback: ProgressCallback | None = None,
         correlation_id: str | None = None,
         results_dir: Path | None = None,
+        needs_ocr: bool | None = None,
     ) -> tuple[str, Path | None]:
         """Конвертирует PDF в LaTeX или Markdown через Docling."""
         validate_pdf(file_path)
@@ -144,7 +156,8 @@ class OCRService:
             progress_callback(5, "validating")
 
         self._apply_language(language)
-        needs_ocr = _detect_scan_quality(file_path)
+        if needs_ocr is None:
+            needs_ocr = _detect_scan_quality(file_path)
         # Pipeline уже может быть загружен в warm_up; применяем OCR до convert
         _ = self.converter
         self._apply_ocr(needs_ocr)
@@ -152,7 +165,11 @@ class OCRService:
         preprocessed_path: Path | None = None
 
         try:
-            preprocessed_path = self.preprocess_pdf(file_path, correlation_id=correlation_id)
+            preprocessed_path = self.preprocess_pdf_for_ocr(
+                file_path,
+                needs_enhancement=needs_ocr,
+                correlation_id=correlation_id,
+            )
             working_path = preprocessed_path
 
             if progress_callback:
@@ -251,6 +268,7 @@ def get_ocr_service(
     artifacts_path: Path | None = None,
     use_gpu: bool = True,
     do_formula_enrichment: bool = False,
+    document_timeout: float = 30.0,
 ) -> OCRService:
     """Возвращает синглтон OCRService для воркера."""
     global _ocr_service_instance  # noqa: PLW0603
@@ -259,6 +277,7 @@ def get_ocr_service(
             artifacts_path=artifacts_path,
             use_gpu=use_gpu,
             do_formula_enrichment=do_formula_enrichment,
+            document_timeout=document_timeout,
         )
     return _ocr_service_instance
 

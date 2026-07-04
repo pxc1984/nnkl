@@ -4,7 +4,6 @@
 	import AnimatedList from "$lib/components/ui/AnimatedList.svelte";
 	import { getApiErrorMessage } from "$lib/api/auth";
 	import { uploadKnowledgeObjects } from "$lib/api/data";
-	import { Button } from "$lib/components/ui/button/index.js";
 	import UploadIcon from "@lucide/svelte/icons/upload";
 	import { formatBytes } from "$lib/data/utils";
 
@@ -36,11 +35,7 @@
 	let fileMessages = $derived(entries.map((entry) => entry.errorMessage));
 	let fileSucceeded = $derived(entries.map((entry) => entry.status === "success"));
 	let now = $state(Date.now());
-	let uploadStartedAt = $state<number | null>(null);
-	let uploadFinishedAt = $state<number | null>(null);
 	let ticker: ReturnType<typeof setInterval> | null = null;
-	let uploadButtonLabel = $derived(isUploading ? `Загрузка... ${formatElapsed(getTotalElapsedMs())}` : "Загрузить");
-
 	const SUPPORTED_EXTENSIONS = [".pdf", ".docx", ".pptx"];
 
 	function startTicker() {
@@ -82,6 +77,16 @@
 		}
 
 		entries = [...entries, ...newEntries];
+
+		if (newEntries.length > 0) {
+			queueMicrotask(() => {
+				void handleUpload();
+			});
+		}
+	}
+
+	function updateEntry(index: number, updater: (entry: UploadEntry) => UploadEntry): void {
+		entries = entries.map((entry, entryIndex) => (entryIndex === index ? updater(entry) : entry));
 	}
 
 	async function extractZip(zipFile: File): Promise<File[]> {
@@ -172,15 +177,6 @@
 		return Math.max(end - entry.startedAt, 0);
 	}
 
-	function getTotalElapsedMs(): number {
-		if (!uploadStartedAt) {
-			return 0;
-		}
-
-		const end = uploadFinishedAt ?? now;
-		return Math.max(end - uploadStartedAt, 0);
-	}
-
 	function formatElapsed(ms: number): string {
 		return `${(ms / 1000).toFixed(1)}s`;
 	}
@@ -197,35 +193,62 @@
 		return "bg-primary";
 	}
 
-	async function uploadEntry(entry: UploadEntry): Promise<void> {
-		entry.startedAt = Date.now();
-		entry.finishedAt = null;
-		entry.status = "uploading";
-		entry.showProgress = true;
+	async function uploadEntry(index: number): Promise<void> {
+		updateEntry(index, (entry) => ({
+			...entry,
+			startedAt: null,
+			finishedAt: null,
+			progress: 0,
+			status: "uploading",
+			showProgress: true,
+			errorMessage: "",
+		}));
 
 		try {
+			const file = entries[index]?.file;
+			if (!file) {
+				return;
+			}
+
 			await uploadKnowledgeObjects(
-				[entry.file],
+				[file],
 				{ recursive: true },
 				(progressEvent) => {
-					if (!progressEvent.total) {
+					const total = progressEvent.total;
+					if (!total) {
 						return;
 					}
 
-					entry.progress = Math.min(
+					const progress = Math.min(
 						100,
-						Math.round((progressEvent.loaded / progressEvent.total) * 100),
+						Math.round((progressEvent.loaded / total) * 100),
 					);
+
+					updateEntry(index, (entry) => ({
+						...entry,
+						progress,
+						startedAt: entry.startedAt ?? (progress === 100 ? Date.now() : null),
+					}));
 				},
 			);
-			entry.progress = 100;
-			entry.status = "success";
-			entry.finishedAt = Date.now();
+
+			updateEntry(index, (entry) => ({
+				...entry,
+				progress: 100,
+				startedAt: entry.startedAt ?? Date.now(),
+				status: "success",
+				finishedAt: Date.now(),
+			}));
 		} catch (error) {
-			entry.status = "error";
-			entry.finishedAt = Date.now();
-			entry.errorMessage = getApiErrorMessage(error, `Не удалось загрузить файл ${entry.name}.`);
-			uploadError ||= entry.errorMessage;
+			const entryName = entries[index]?.name || "файл";
+			const errorMessage = getApiErrorMessage(error, `Не удалось загрузить файл ${entryName}.`);
+			updateEntry(index, (entry) => ({
+				...entry,
+				status: "error",
+				finishedAt: Date.now(),
+				errorMessage,
+			}));
+			uploadError ||= errorMessage;
 		}
 	}
 
@@ -234,39 +257,37 @@
 			return;
 		}
 
-		const entriesToUpload = entries.filter((entry) => entry.status !== "success");
+		const entriesToUploadIndices = entries.flatMap((entry, index) => (entry.status !== "success" ? [index] : []));
 
-		if (entriesToUpload.length === 0) {
+		if (entriesToUploadIndices.length === 0) {
 			return;
 		}
 
 		isUploading = true;
 		uploadError = "";
-		uploadStartedAt = Date.now();
-		uploadFinishedAt = null;
 		startTicker();
 
-		for (const entry of entries) {
-			entry.showProgress = false;
-			if (entriesToUpload.includes(entry)) {
-				entry.progress = 0;
-				entry.status = "idle";
-				entry.errorMessage = "";
-				entry.startedAt = null;
-				entry.finishedAt = null;
-			}
-		}
+		entries = entries.map((entry) =>
+			entry.status === "success"
+				? { ...entry, showProgress: false }
+				: {
+					...entry,
+					progress: 0,
+					status: "idle",
+					showProgress: false,
+					errorMessage: "",
+					startedAt: null,
+					finishedAt: null,
+				},
+		);
 
-		await Promise.all(entriesToUpload.map((entry) => uploadEntry(entry)));
+		await Promise.all(entriesToUploadIndices.map((index) => uploadEntry(index)));
 
 		isUploading = false;
-		uploadFinishedAt = Date.now();
-		now = uploadFinishedAt;
+		now = Date.now();
 		stopTicker();
 
-		for (const entry of entriesToUpload) {
-			entry.showProgress = false;
-		}
+		entries = entries.map((entry) => ({ ...entry, showProgress: false }));
 	}
 </script>
 
@@ -286,12 +307,6 @@
 		class="sr-only"
 		onchange={handleInputChange}
 	/>
-
-	{#if uploadError}
-		<div class="bg-destructive/10 text-destructive mx-4 mt-4 rounded-2xl border border-destructive/20 px-4 py-3 text-sm">
-			{uploadError}
-		</div>
-	{/if}
 
 	{#if entries.length === 0}
 		<div
@@ -326,15 +341,4 @@
 			/>
 		</div>
 	{/if}
-
-	<div class="fixed bottom-6 right-6 z-50">
-		<Button
-			type="button"
-			class="h-12 rounded-full px-6 shadow-lg text-base font-medium"
-			disabled={entries.length === 0 || isUploading}
-			onclick={() => void handleUpload()}
-		>
-			{uploadButtonLabel}
-		</Button>
-	</div>
 </div>

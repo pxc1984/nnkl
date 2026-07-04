@@ -15,7 +15,7 @@ from app.api.schemas import ParseRequest, TaskStatus
 from app.config import Settings
 from app.db.models import InputBlob, ParseJob, ParseResult
 from app.services.ocr_service import get_ocr_service
-from app.use_cases.document_extractor import extract_native_document_text
+from app.use_cases.document_extractor import extract_native_document_text, should_use_native_pdf_text
 
 
 class InputBlobNotFoundError(Exception):
@@ -89,6 +89,7 @@ def parse_document(
         session.refresh(job)
         return job
     except Exception as exc:
+        session.rollback()
         job.status = TaskStatus.FAILED.value
         job.error = str(exc)
         session.commit()
@@ -114,10 +115,14 @@ def _parse_input_document(
     settings: Settings,
 ) -> tuple[str, Path | None]:
     if input_path.suffix.lower() == ".pdf":
+        if should_use_native_pdf_text(input_path):
+            return extract_native_document_text(input_path, output_format=output_format), None
+
         ocr_service = get_ocr_service(
             artifacts_path=settings.ocr_docling_artifacts_path,
             use_gpu=settings.ocr_docling_use_gpu,
             do_formula_enrichment=settings.ocr_docling_do_formula_enrichment,
+            document_timeout=settings.ocr_docling_document_timeout_seconds,
         )
         return ocr_service.convert(
             input_path,
@@ -125,6 +130,7 @@ def _parse_input_document(
             language=language,
             correlation_id=correlation_id,
             results_dir=results_dir,
+            needs_ocr=True,
         )
 
     content = extract_native_document_text(input_path, output_format=output_format)

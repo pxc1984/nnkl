@@ -42,6 +42,7 @@ import * as Sidebar from "$lib/components/ui/sidebar/index.js";
 	});
 
 	const isGraphRoute = $derived(page.url.pathname.startsWith("/data/graph"));
+	const isAskRoute = $derived(page.url.pathname.startsWith("/data/ask"));
 
 	let { children }: { children: Snippet } = $props();
 
@@ -61,9 +62,9 @@ import * as Sidebar from "$lib/components/ui/sidebar/index.js";
 
 <Sidebar.Provider>
 	<AppSidebar currentUser={$authState.user} />
-	<Sidebar.Inset class="bg-background min-h-svh md:min-h-[calc(100svh-1rem)]">
+	<Sidebar.Inset class={`min-h-svh bg-background ${isAskRoute ? "relative overflow-hidden" : ""} md:min-h-[calc(100svh-1rem)]`}>
 		<header
-			class="flex h-14 shrink-0 items-center transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12"
+			class={`flex h-14 shrink-0 items-center transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 ${isAskRoute ? "absolute inset-x-0 top-0 z-20 bg-gradient-to-b from-black/75 via-black/35 to-transparent" : ""}`}
 		>
 			<div class="flex items-center px-4">
 				<Sidebar.Trigger class="-ms-1" />
@@ -85,7 +86,7 @@ import * as Sidebar from "$lib/components/ui/sidebar/index.js";
 				</Breadcrumb.Root>
 			</div>
 		</header>
-		<main class={`flex min-h-0 flex-1 flex-col ${isGraphRoute ? "px-0" : "px-6 pb-8 pt-2 md:px-10"}`}>
+		<main class={`flex min-h-0 flex-1 flex-col ${isGraphRoute ? "px-0" : isAskRoute ? "px-0 pb-0 pt-0" : "px-6 pb-8 pt-2 md:px-10"}`}>
 			{@render children()}
 		</main>
 	</Sidebar.Inset>

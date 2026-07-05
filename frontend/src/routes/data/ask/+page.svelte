@@ -1,5 +1,6 @@
 <script lang="ts">
 	import {prependQuerySession} from "$lib/ask/query-sessions";
+	import PrismaticBurst from "$lib/components/PrismaticBurst.svelte";
 	import {Button} from "$lib/components/ui/button/index.js";
 	import MarkdownRenderer from "$lib/components/markdown-renderer.svelte";
 	import {ArrowUpIcon, GlobeIcon, FileTextIcon} from "@lucide/svelte";
@@ -14,6 +15,7 @@
 	let isLoading = $state(false);
 	let answer = $state<AskResponse | null>(null);
 	let errorMessage = $state("");
+	let hasSubmittedPrompt = $state(false);
 
 	async function handleSubmit() {
 		const query = prompt.trim();
@@ -22,6 +24,7 @@
 		}
 
 		isLoading = true;
+		hasSubmittedPrompt = true;
 		errorMessage = "";
 		answer = null;
 
@@ -131,8 +134,26 @@
 	}
 </script>
 
-<main class="flex flex-1 px-4 py-6">
-	<section class="mx-auto flex w-full max-w-3xl flex-1 flex-col">
+<main class="relative flex flex-1 overflow-hidden bg-[#101010]">
+	{#if !hasSubmittedPrompt}
+		<div class="pointer-events-none absolute inset-0">
+			<div class="absolute inset-0 opacity-75">
+				<PrismaticBurst
+					intensity={1.75}
+					speed={0.5}
+					animationType="rotate3d"
+					distort={0.35}
+					hoverDampness={0.12}
+					rayCount={8}
+					colors={["#38bdf8", "#818cf8", "#c084fc", "#f472b6"]}
+					mixBlendMode="screen"
+				/>
+			</div>
+			<div class="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(8,12,18,0)_0%,_rgba(8,12,18,0.5)_42%,_rgba(8,12,18,0.88)_100%)]"></div>
+		</div>
+	{/if}
+
+	<section class="relative z-10 mx-auto flex w-full max-w-3xl flex-1 flex-col px-4 pb-6 pt-20 md:px-8">
 		<div class="flex flex-1 flex-col">
 			{#if answer}
 				<div class="flex-1 px-2 py-10 md:px-4">

@@ -153,7 +153,7 @@
 									>
 										<FileTextIcon class="size-3.5" />
 										<span class="truncate">
-											[{ref.number || 0}] {ref.filename || `Документ ${ref.id.substring(0, 8)}...`}
+											{ref.number ? `[${ref.number}] ` : ""}{ref.filename || `Документ ${ref.id.substring(0, 8)}...`}
 										</span>
 
 										{#if ref.type}

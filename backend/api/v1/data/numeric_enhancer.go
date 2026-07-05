@@ -201,41 +201,59 @@ func enrichResponseReferences(response string, refs json.RawMessage) (string, js
 	return response, updatedRefs
 }
 
-// assignReferenceNumbers парсит markdown-блок References и заполняет Number
+// assignReferenceNumbers парсит markdown-блок References/Источники и заполняет Number
 // в enriched references, чтобы номера в тексте ответа совпадали со списком источников.
 func assignReferenceNumbers(response string, refs []EnrichedReference) {
-	reBlock := regexp.MustCompile(`(?im)^##\s*(References|Источники)\s*\n((?:^-\s.*\n?)+)`)
+	reBlock := regexp.MustCompile(`(?im)^#{1,3}\s*(References|Источники|Ссылки)\s*\n((?:^\s*[-*]\s.*\n?)+)`)
 	m := reBlock.FindStringSubmatch(response)
 	if m == nil {
 		return
 	}
 
-	reLine := regexp.MustCompile(`(?i)^-\s*\[(\d+)\]\s*(.+?)\s*$`)
+	reLine := regexp.MustCompile(`(?i)^\s*[-*]\s*\[(\d+)\]\s*(.+?)\s*$`)
 	numberByName := make(map[string]int)
+	normalize := func(s string) string {
+		s = strings.TrimSuffix(s, ".md")
+		s = strings.TrimRight(s, ". ")
+		return strings.TrimSpace(s)
+	}
 	for _, line := range strings.Split(m[2], "\n") {
 		lm := reLine.FindStringSubmatch(line)
 		if lm == nil {
 			continue
 		}
 		num, _ := strconv.Atoi(lm[1])
-		name := strings.TrimSpace(lm[2])
+		name := normalize(lm[2])
 		numberByName[name] = num
 	}
 
 	for i := range refs {
-		if num, ok := numberByName[refs[i].Filename]; ok {
-			refs[i].Number = num
-		} else if num, ok := numberByName[refs[i].ID]; ok {
-			refs[i].Number = num
-		} else if num, ok := numberByName[refs[i].ID+".md"]; ok {
-			refs[i].Number = num
+		candidates := []string{
+			normalize(refs[i].Filename),
+			normalize(refs[i].SourcePath),
+			refs[i].ID,
+			refs[i].ID + ".md",
+		}
+		for _, cand := range candidates {
+			if cand == "" {
+				continue
+			}
+			if num, ok := numberByName[cand]; ok {
+				refs[i].Number = num
+				break
+			}
+			// Пробуем нормализованный вариант имени из блока.
+			if num, ok := numberByName[normalize(cand)]; ok {
+				refs[i].Number = num
+				break
+			}
 		}
 	}
 }
 
-// cleanReferencesBlock удаляет markdown-блок References из текста ответа.
+// cleanReferencesBlock удаляет markdown-блок References/Источники/Ссылки из текста ответа.
 func cleanReferencesBlock(response string) string {
-	re := regexp.MustCompile(`(?im)^##\s*(References|Источники)\s*\n(?:^-\s.*\n?)+`)
+	re := regexp.MustCompile(`(?im)^#{1,3}\s*(References|Источники|Ссылки)\s*\n(?:^\s*[-*]\s.*\n?)+`)
 	return strings.TrimSpace(re.ReplaceAllString(response, ""))
 }
 

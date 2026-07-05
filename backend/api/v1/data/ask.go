@@ -31,11 +31,12 @@ type AskResponse struct {
 
 // EnrichedReference — единый формат источника для фронтенда.
 type EnrichedReference struct {
-	ID        string    `json:"id"`
-	Filename  string    `json:"filename"`
-	Type      string    `json:"type"`
-	CreatedAt time.Time `json:"createdAt"`
-	Number    int       `json:"number,omitempty"`
+	ID         string    `json:"id"`
+	Filename   string    `json:"filename"`
+	Type       string    `json:"type"`
+	CreatedAt  time.Time `json:"createdAt"`
+	Number     int       `json:"number,omitempty"`
+	SourcePath string    `json:"sourcePath,omitempty"`
 }
 
 func (a *DataAPI) ask(c *gin.Context) {
@@ -117,15 +118,15 @@ func (a *DataAPI) processReferences(ctx context.Context, rawRefs json.RawMessage
 		return rawRefs, fmt.Errorf("failed to unmarshal references: %w", err)
 	}
 
-	docIDs := make(map[string]struct{})
+	docIDs := make(map[string]string) // id -> sourcePath (оригинальный file_path от LightRAG)
 	collectDocumentIDs(refsData, docIDs)
 	if len(docIDs) == 0 {
 		return rawRefs, nil
 	}
 
 	enriched := make([]EnrichedReference, 0, len(docIDs))
-	for id := range docIDs {
-		ref := EnrichedReference{ID: id}
+	for id, sourcePath := range docIDs {
+		ref := EnrichedReference{ID: id, SourcePath: sourcePath}
 		if blob, err := a.store.GetBlobByID(ctx, id); err == nil {
 			ref.Filename = blob.Filename
 			ref.Type = blob.FileType
@@ -145,20 +146,30 @@ func (a *DataAPI) processReferences(ctx context.Context, rawRefs json.RawMessage
 	return json.Marshal(enriched)
 }
 
-// collectDocumentIDs рекурсивно извлекает UUID документов из любой структуры references.
-func collectDocumentIDs(v interface{}, out map[string]struct{}) {
+// collectDocumentIDs рекурсивно извлекает UUID документов и их sourcePath
+// (оригинальный file_path от LightRAG) из любой структуры references.
+func collectDocumentIDs(v interface{}, out map[string]string) {
 	switch val := v.(type) {
 	case string:
 		if id := extractDocumentID(val); id != "" {
-			out[id] = struct{}{}
+			// Сохраняем строку как sourcePath, если для этого id ещё нет более точного пути.
+			if _, ok := out[id]; !ok {
+				out[id] = val
+			}
 		}
 	case []interface{}:
 		for _, item := range val {
 			collectDocumentIDs(item, out)
 		}
 	case map[string]interface{}:
-		// Сначала проверяем поля, в которых обычно лежит идентификатор.
-		for _, key := range []string{"file_path", "source_id", "reference_id", "id", "document_id"} {
+		// Сначала проверяем file_path — это наиболее точный sourcePath.
+		if fp, ok := val["file_path"].(string); ok {
+			if id := extractDocumentID(fp); id != "" {
+				out[id] = fp
+			}
+		}
+		// Затем другие поля с идентификаторами.
+		for _, key := range []string{"source_id", "reference_id", "id", "document_id"} {
 			if raw, ok := val[key]; ok {
 				collectDocumentIDs(raw, out)
 			}

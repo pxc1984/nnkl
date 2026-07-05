@@ -2,9 +2,17 @@ import { api } from "$lib/api/client";
 import { getStoredAuthSession } from "$lib/auth/storage";
 import { API_URL } from "$lib/config";
 
+export type NumericFilter = {
+  property: string;
+  min?: number;
+  max?: number;
+  unit?: string;
+};
+
 export type AskRequest = {
   query: string;
   mode?: "naive" | "local" | "global" | "hybrid";
+  numericFilters?: NumericFilter[];
 };
 
 export type Reference = {
@@ -39,10 +47,12 @@ export function isNoContextAnswer(answer: string): boolean {
 export async function askQuestion(
   query: string,
   mode: AskRequest["mode"] = "naive",
+  numericFilters?: NumericFilter[],
 ): Promise<AskResponse> {
   const response = await api.post<AskResponse>("/api/v1/data/ask", {
     query,
     mode,
+    numericFilters,
   });
   return response.data;
 }
@@ -76,6 +86,7 @@ type StreamMessage = {
 export async function streamQuestion(
   query: string,
   mode: AskRequest["mode"] = "naive",
+  numericFilters: NumericFilter[] | undefined,
   onChunk: (chunk: string) => void,
 ): Promise<void> {
   const session = getStoredAuthSession();
@@ -87,7 +98,7 @@ export async function streamQuestion(
         ? { Authorization: `Bearer ${session.accessToken}` }
         : {}),
     },
-    body: JSON.stringify({ query, mode }),
+    body: JSON.stringify({ query, mode, numericFilters }),
   });
 
   if (!response.ok) {

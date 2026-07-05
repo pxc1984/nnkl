@@ -6,6 +6,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/pxc1984/nnkl-backend/store/models"
 )
 
 // NumericConstraint описывает числовое ограничение, найденное в вопросе пользователя.
@@ -155,19 +157,100 @@ func parseFloat(s string) float64 {
 	return v
 }
 
+var prepositions = map[string]struct{}{
+	"в": {}, "на": {}, "по": {}, "из": {}, "с": {}, "к": {}, "о": {},
+	"об": {}, "под": {}, "над": {}, "при": {}, "для": {}, "от": {},
+	"до": {}, "через": {}, "за": {}, "про": {}, "у": {}, "около": {},
+	"между": {}, "перед": {}, "после": {}, "ввиду": {}, "вопреки": {},
+}
+
 func inferProperty(query, matched string) string {
 	idx := strings.Index(strings.ToLower(query), strings.ToLower(matched))
-	if idx > 0 {
-		before := strings.TrimSpace(query[:idx])
-		words := strings.Fields(before)
-		for i := len(words) - 1; i >= 0; i-- {
-			w := cleanProperty(words[i])
-			if w != "" {
-				return w
-			}
+	if idx <= 0 {
+		return "значение"
+	}
+
+	before := strings.TrimSpace(query[:idx])
+	words := strings.Fields(before)
+
+	// Берём последние значащие слова (до 3), исключая предлоги.
+	var parts []string
+	for i := len(words) - 1; i >= 0 && len(parts) < 3; i-- {
+		w := cleanProperty(words[i])
+		if w == "" {
+			continue
 		}
+		if _, isPrep := prepositions[w]; isPrep {
+			break
+		}
+		parts = append([]string{w}, parts...)
+	}
+
+	if len(parts) > 0 {
+		return strings.Join(parts, " ")
 	}
 	return "значение"
+}
+
+// buildNumericFilters объединяет явные фильтры из запроса и фильтры,
+// извлечённые из текста вопроса, в единый список для поиска в БД.
+func buildNumericFilters(req AskRequest) []models.NumericFactFilter {
+	seen := make(map[string]struct{})
+	var filters []models.NumericFactFilter
+
+	add := func(f models.NumericFactFilter) {
+		key := fmt.Sprintf("%s|%.4g|%.4g|%s", f.Property, f.Min, f.Max, f.Unit)
+		if _, ok := seen[key]; ok {
+			return
+		}
+		seen[key] = struct{}{}
+		filters = append(filters, f)
+	}
+
+	for _, f := range req.NumericFilters {
+		add(models.NumericFactFilter{
+			Property: strings.ToLower(strings.TrimSpace(f.Property)),
+			Min:      f.Min,
+			Max:      f.Max,
+			Unit:     strings.ToLower(strings.TrimSpace(f.Unit)),
+		})
+	}
+
+	for _, c := range extractNumericConstraints(req.Query) {
+		var min, max float64
+		switch c.Operator {
+		case "<=", "<":
+			max = c.Value
+		case ">=", ">":
+			min = c.Value
+		case "between":
+			min = c.Value
+			max = c.Value2
+		default:
+			min = c.Value
+			max = c.Value
+		}
+		add(models.NumericFactFilter{
+			Property: c.Property,
+			Min:      min,
+			Max:      max,
+			Unit:     c.Unit,
+		})
+	}
+
+	return filters
+}
+
+// enhanceQueryWithDocumentFilter добавляет в запрос инструкцию использовать
+// только документы из переданного списка.
+func enhanceQueryWithDocumentFilter(query string, docIDs []string) string {
+	var b strings.Builder
+	b.WriteString(query)
+	b.WriteString("\n\n")
+	b.WriteString("При ответе используй информацию ТОЛЬКО из следующих документов (их идентификаторы): ")
+	b.WriteString(strings.Join(docIDs, ", "))
+	b.WriteString(". Если документ не из этого списка — не используй его.")
+	return b.String()
 }
 
 // enrichResponseReferences заменяет UUID источников в тексте ответа LightRAG

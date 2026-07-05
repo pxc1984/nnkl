@@ -43,6 +43,11 @@ type Store interface {
 	CreateQuerySession(context.Context, models.CreateQuerySessionParams) (*models.QuerySession, error)
 	GetQuerySessionByID(context.Context, string) (*models.QuerySession, error)
 	ListQuerySessions(context.Context, string, models.ListQuerySessionsParams) ([]models.QuerySession, int64, error)
+	CreateNumericFact(context.Context, *models.NumericFact) error
+	CreateNumericFacts(context.Context, []models.NumericFact) error
+	ListNumericFacts(context.Context, models.NumericFactFilter) ([]models.NumericFact, error)
+	FindDocumentsByNumericFacts(context.Context, []models.NumericFactFilter) ([]string, error)
+	DeleteNumericFactsByDocumentID(context.Context, string) error
 }
 
 var globalStore Store

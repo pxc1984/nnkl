@@ -308,6 +308,34 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
+  /api/v1/data/{id}/numeric-facts:
+    get:
+      summary: Получить числовые факты документа
+      description: Возвращает извлечённые из документа числовые факты для отладки фильтрации.
+      tags:
+      - Data
+      security:
+      - BearerAuth: []
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: Список числовых фактов
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/NumericFact'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /api/v1/data/{id}:
     get:
       summary: Получить данные объекта
@@ -677,6 +705,11 @@ components:
           type: string
           default: naive
           description: Режим поиска (naive, local, global, hybrid)
+        numericFilters:
+          type: array
+          description: Явные числовые фильтры для предварительной фильтрации документов
+          items:
+            $ref: '#/components/schemas/NumericFilter'
     AskResponse:
       type: object
       required:
@@ -695,6 +728,49 @@ components:
         references:
           type: object
           description: Ссылки на источники (proprietary JSON)
+    NumericFilter:
+      type: object
+      properties:
+        property:
+          type: string
+          description: Название свойства (например, "концентрация сульфатов")
+        min:
+          type: number
+          description: Минимальное значение
+        max:
+          type: number
+          description: Максимальное значение
+        unit:
+          type: string
+          description: Единица измерения (например, "мг/л")
+    NumericFact:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        documentId:
+          type: string
+          format: uuid
+        chunkId:
+          type: string
+        entityName:
+          type: string
+        property:
+          type: string
+        value:
+          type: number
+        value2:
+          type: number
+        unit:
+          type: string
+        operator:
+          type: string
+        rawText:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
     DataUploadParams:
       type: object
       properties:

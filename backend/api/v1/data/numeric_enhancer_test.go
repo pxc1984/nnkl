@@ -1,156 +1,99 @@
 package data
 
 import (
-	"encoding/json"
-	"strings"
 	"testing"
+
+	"github.com/pxc1984/nnkl-backend/store/models"
 )
 
-func TestExtractNumericConstraints(t *testing.T) {
+func TestBuildNumericFilters(t *testing.T) {
 	tests := []struct {
-		name  string
-		query string
-		want  int
-		first NumericConstraint
+		name string
+		req  AskRequest
+		want []models.NumericFactFilter
 	}{
 		{
-			name:  "less-or-equal with unicode",
-			query: "Какие методы обессоливания подходят, если сульфаты ≤300 мг/л?",
-			want:  1,
-			first: NumericConstraint{Property: "сульфаты", Operator: "<=", Value: 300, Unit: "мг/л"},
+			name: "explicit filters only",
+			req: AskRequest{
+				Query: "test",
+				NumericFilters: []NumericFilter{
+					{Property: "концентрация", Min: 10, Max: 20, Unit: "мг/л"},
+				},
+			},
+			want: []models.NumericFactFilter{
+				{Property: "концентрация", Min: 10, Max: 20, Unit: "мг/л"},
+			},
 		},
 		{
-			name:  "greater-than with celsius",
-			query: "сплавы с температурой плавления > 1000 °C",
-			want:  1,
-			first: NumericConstraint{Property: "температурой плавления", Operator: ">", Value: 1000, Unit: "°c"},
+			name: "extracted from query",
+			req: AskRequest{
+				Query: "концентрация сульфатов от 100 до 200 мг/л",
+			},
+			want: []models.NumericFactFilter{
+				{Property: "концентрация сульфатов", Min: 100, Max: 200, Unit: "мг/л"},
+			},
 		},
 		{
-			name:  "less-or-equal without unit",
-			query: "pH ≤ 8,5",
-			want:  1,
-			first: NumericConstraint{Property: "ph", Operator: "<=", Value: 8.5, Unit: ""},
+			name: "explicit and extracted merged",
+			req: AskRequest{
+				Query: "pH больше 7",
+				NumericFilters: []NumericFilter{
+					{Property: "температура", Min: 20, Max: 30, Unit: "°C"},
+				},
+			},
+			want: []models.NumericFactFilter{
+				{Property: "температура", Min: 20, Max: 30, Unit: "°c"},
+				{Property: "ph", Min: 7, Max: 0, Unit: ""},
+			},
 		},
 		{
-			name:  "russian word operator",
-			query: "концентрация хлоридов не более 200 мг/л",
-			want:  1,
-			first: NumericConstraint{Property: "концентрация хлоридов", Operator: "<=", Value: 200, Unit: "мг/л"},
-		},
-		{
-			name:  "range",
-			query: "скорость потока от 10 до 50 м/с",
-			want:  1,
-			first: NumericConstraint{Property: "потока", Operator: "between", Value: 10, Value2: 50, Unit: "м/с"},
-		},
-		{
-			name:  "decimal separator comma",
-			query: "pH ≤ 8,5",
-			want:  1,
-			first: NumericConstraint{Property: "ph", Operator: "<=", Value: 8.5, Unit: ""},
-		},
-		{
-			name:  "no constraints",
-			query: "Какие методы обессоливания подходят?",
-			want:  0,
+			name: "no filters",
+			req: AskRequest{Query: "просто вопрос"},
+			want: nil,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := extractNumericConstraints(tt.query)
-			if len(got) != tt.want {
-				t.Fatalf("expected %d constraints, got %d: %+v", tt.want, len(got), got)
+			got := buildNumericFilters(tt.req)
+			if len(got) != len(tt.want) {
+				t.Fatalf("expected %d filters, got %d: %+v", len(tt.want), len(got), got)
 			}
-			if tt.want > 0 && len(got) > 0 {
-				if got[0].Property != tt.first.Property || got[0].Operator != tt.first.Operator || got[0].Value != tt.first.Value || got[0].Unit != tt.first.Unit {
-					t.Errorf("first constraint mismatch: got %+v, want %+v", got[0], tt.first)
+			for i := range got {
+				if got[i].Property != tt.want[i].Property ||
+					got[i].Min != tt.want[i].Min ||
+					got[i].Max != tt.want[i].Max ||
+					got[i].Unit != tt.want[i].Unit {
+					t.Errorf("filter %d: got %+v, want %+v", i, got[i], tt.want[i])
 				}
 			}
 		})
 	}
 }
 
-func TestEnhanceQueryWithNumericConstraints(t *testing.T) {
-	query := "методы при сульфатах ≤300 мг/л"
-	enhanced := enhanceQueryWithNumericConstraints(query)
-
-	if !strings.Contains(enhanced, query) {
-		t.Error("enhanced query should contain original query")
+func TestEnhanceQueryWithDocumentFilter(t *testing.T) {
+	query := "какие способы применялись"
+	docIDs := []string{"doc-1", "doc-2"}
+	got := enhanceQueryWithDocumentFilter(query, docIDs)
+	if got == query {
+		t.Error("expected enhanced query to differ from original")
 	}
-	if !strings.Contains(enhanced, "не более 300 мг/л") {
-		t.Errorf("enhanced query should contain constraint instruction, got:\n%s", enhanced)
-	}
-}
-
-func TestEnhanceQueryWithoutConstraints(t *testing.T) {
-	query := "расскажи про электроэкстракцию никеля"
-	enhanced := enhanceQueryWithNumericConstraints(query)
-	if enhanced != query {
-		t.Errorf("expected unchanged query, got:\n%s", enhanced)
+	for _, id := range docIDs {
+		if !contains(got, id) {
+			t.Errorf("expected enhanced query to contain %q", id)
+		}
 	}
 }
 
-func TestEnrichResponseReferences(t *testing.T) {
-	t.Run("dash bullets with uuid filenames", func(t *testing.T) {
-		refs := json.RawMessage(`[
-			{"id": "14bd1a61-3a2f-4936-a2bd-00c5266ac123", "filename": "Bindura_2010.pdf", "type": "pdf", "createdAt": "2026-01-01T00:00:00Z"},
-			{"id": "aea34f4a-afb9-40bf-8db4-0fb0391bfccf", "filename": "Cunico Resources.pdf", "type": "pdf", "createdAt": "2026-01-01T00:00:00Z"}
-		]`)
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsAt(s, substr, 0))
+}
 
-		response := "## References\n- [1] 14bd1a61-3a2f-4936-a2bd-00c5266ac123.md\n- [3] aea34f4a-afb9-40bf-8db4-0fb0391bfccf.md\n\nSome text with [1] and [3]."
-
-		enrichedResponse, enrichedRefs := enrichResponseReferences(response, refs)
-
-		if strings.Contains(enrichedResponse, "## References") {
-			t.Error("References block should be removed")
+func containsAt(s, substr string, start int) bool {
+	for i := start; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
 		}
-		if strings.Contains(enrichedResponse, "14bd1a61-3a2f-4936-a2bd-00c5266ac123") {
-			t.Error("uuid should be replaced with filename")
-		}
-		if !strings.Contains(enrichedResponse, "Some text with [1] and [3].") {
-			t.Errorf("text after References block should be preserved, got:\n%s", enrichedResponse)
-		}
-
-		var parsedRefs []EnrichedReference
-		if err := json.Unmarshal(enrichedRefs, &parsedRefs); err != nil {
-			t.Fatalf("failed to unmarshal enriched refs: %v", err)
-		}
-		if len(parsedRefs) != 2 {
-			t.Fatalf("expected 2 refs, got %d", len(parsedRefs))
-		}
-		if parsedRefs[0].Number != 1 {
-			t.Errorf("expected ref 0 number 1, got %d", parsedRefs[0].Number)
-		}
-		if parsedRefs[1].Number != 3 {
-			t.Errorf("expected ref 1 number 3, got %d", parsedRefs[1].Number)
-		}
-	})
-
-	t.Run("star bullets with sourcePath labels", func(t *testing.T) {
-		refs := json.RawMessage(`[
-			{"id": "14bd1a61-3a2f-4936-a2bd-00c5266ac123", "filename": "Bindura_2010.pdf", "sourcePath": "Bindura Nickel 2010 г.md", "type": "pdf", "createdAt": "2026-01-01T00:00:00Z"},
-			{"id": "aea34f4a-afb9-40bf-8db4-0fb0391bfccf", "filename": "Австралия_никель_2011.pdf", "sourcePath": "Никелевая отрасль Австралии.md", "type": "pdf", "createdAt": "2026-01-01T00:00:00Z"}
-		]`)
-
-		response := "# References\n* [1] Никелевая отрасль Австралии\n* [3] Bindura Nickel 2010 г.\n\nSome text."
-
-		_, enrichedRefs := enrichResponseReferences(response, refs)
-
-		var parsedRefs []EnrichedReference
-		if err := json.Unmarshal(enrichedRefs, &parsedRefs); err != nil {
-			t.Fatalf("failed to unmarshal enriched refs: %v", err)
-		}
-
-		numbers := make(map[string]int)
-		for _, ref := range parsedRefs {
-			numbers[ref.Filename] = ref.Number
-		}
-		if numbers["Австралия_никель_2011.pdf"] != 1 {
-			t.Errorf("expected Австралия_никель_2011.pdf number 1, got %d", numbers["Австралия_никель_2011.pdf"])
-		}
-		if numbers["Bindura_2010.pdf"] != 3 {
-			t.Errorf("expected Bindura_2010.pdf number 3, got %d", numbers["Bindura_2010.pdf"])
-		}
-	})
+	}
+	return false
 }

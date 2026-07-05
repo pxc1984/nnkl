@@ -2,9 +2,11 @@ package worker
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -28,10 +30,16 @@ type TextIndexer interface {
 	SendText(ctx context.Context, text, fileSource string) error
 }
 
+type FactExtractor interface {
+	IsConfigured() bool
+	Extract(ctx context.Context, chunkText, documentID, chunkID string) ([]models.NumericFact, error)
+}
+
 type Queue struct {
-	store   store.Store
-	ocr     OCRService
-	indexer TextIndexer
+	store         store.Store
+	ocr           OCRService
+	indexer       TextIndexer
+	factExtractor FactExtractor
 
 	workerID      string
 	workerCount   int
@@ -43,7 +51,7 @@ type Queue struct {
 	wg     sync.WaitGroup
 }
 
-func New(s store.Store, ocr OCRService, indexer TextIndexer, wakeBuffer int) *Queue {
+func New(s store.Store, ocr OCRService, indexer TextIndexer, factExtractor FactExtractor, wakeBuffer int) *Queue {
 	if wakeBuffer <= 0 {
 		wakeBuffer = 1
 	}
@@ -52,6 +60,7 @@ func New(s store.Store, ocr OCRService, indexer TextIndexer, wakeBuffer int) *Qu
 		store:         s,
 		ocr:           ocr,
 		indexer:       indexer,
+		factExtractor: factExtractor,
 		workerID:      buildWorkerID(),
 		workerCount:   defaultWorkerCount,
 		pollInterval:  defaultPollInterval,
@@ -167,6 +176,7 @@ func (q *Queue) processMarkdown(ctx context.Context, upload models.Upload) {
 			slog.Warn("markdown processing: lightrag send failed", "upload_id", upload.ID, "error", err)
 		}
 	}
+	q.extractAndStoreFacts(ctx, string(upload.InputBlob.Content), upload.ID)
 }
 
 func (q *Queue) processSimple(ctx context.Context, upload models.Upload) {
@@ -209,6 +219,7 @@ func (q *Queue) processSimple(ctx context.Context, upload models.Upload) {
 			slog.Warn("simple extraction: lightrag send failed", "upload_id", upload.ID, "error", err)
 		}
 	}
+	q.extractAndStoreFacts(ctx, output, upload.ID)
 }
 
 func (q *Queue) processOCR(ctx context.Context, upload models.Upload) {
@@ -244,7 +255,58 @@ func (q *Queue) processOCR(ctx context.Context, upload models.Upload) {
 		if err := q.indexer.SendText(ctx, string(updated.OutputBlob.Content), source); err != nil {
 			slog.Warn("ocr processing: lightrag send failed", "upload_id", upload.ID, "error", err)
 		}
+		q.extractAndStoreFacts(ctx, string(updated.OutputBlob.Content), upload.ID)
 	}
+}
+
+func (q *Queue) extractAndStoreFacts(ctx context.Context, text, documentID string) {
+	if q.factExtractor == nil || !q.factExtractor.IsConfigured() {
+		return
+	}
+
+	const chunkSize = 2000
+	const overlap = 200
+	chunks := splitText(text, chunkSize, overlap)
+
+	if err := q.store.DeleteNumericFactsByDocumentID(ctx, documentID); err != nil {
+		slog.Warn("failed to delete old numeric facts", "document_id", documentID, "error", err)
+	}
+
+	for i, chunk := range chunks {
+		if strings.TrimSpace(chunk) == "" {
+			continue
+		}
+		chunkID := fmt.Sprintf("%s:%d", documentID, i)
+		facts, err := q.factExtractor.Extract(ctx, chunk, documentID, chunkID)
+		if err != nil {
+			slog.Warn("fact extraction failed", "document_id", documentID, "chunk", i, "error", err)
+			continue
+		}
+		if len(facts) == 0 {
+			continue
+		}
+		if err := q.store.CreateNumericFacts(ctx, facts); err != nil {
+			slog.Warn("failed to save numeric facts", "document_id", documentID, "chunk", i, "error", err)
+		}
+	}
+}
+
+func splitText(text string, chunkSize, overlap int) []string {
+	if chunkSize <= 0 {
+		return []string{text}
+	}
+	var chunks []string
+	for i := 0; i < len(text); i += chunkSize - overlap {
+		end := i + chunkSize
+		if end > len(text) {
+			end = len(text)
+		}
+		chunks = append(chunks, text[i:end])
+		if end == len(text) {
+			break
+		}
+	}
+	return chunks
 }
 
 func (q *Queue) failUpload(ctx context.Context, uploadID, errorMessage string) {

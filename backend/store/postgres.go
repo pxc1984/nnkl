@@ -43,7 +43,7 @@ func NewPostgresStore() (*PostgresStore, error) {
 	}
 
 	store := &PostgresStore{db: db, sqldb: sqldb}
-	if err := store.db.AutoMigrate(&models.User{}, &models.Session{}, &models.Blob{}, &models.Upload{}, &models.AuditLog{}, &models.QuerySession{}); err != nil {
+	if err := store.db.AutoMigrate(&models.User{}, &models.Session{}, &models.Blob{}, &models.Upload{}, &models.AuditLog{}, &models.QuerySession{}, &models.NumericFact{}); err != nil {
 		_ = sqldb.Close()
 		return nil, fmt.Errorf("migrate postgres schema: %w", err)
 	}
@@ -608,4 +608,80 @@ func (s *PostgresStore) ListQuerySessions(ctx context.Context, userID string, pa
 	var sessions []models.QuerySession
 	err := query.Order("created_at desc").Offset((page - 1) * pageSize).Limit(pageSize).Find(&sessions).Error
 	return sessions, total, err
+}
+
+func (s *PostgresStore) CreateNumericFact(ctx context.Context, fact *models.NumericFact) error {
+	if fact.ID == "" {
+		fact.ID = uuid.NewString()
+	}
+	fact.CreatedAt = time.Now().UTC()
+	return s.db.WithContext(ctx).Create(fact).Error
+}
+
+func (s *PostgresStore) CreateNumericFacts(ctx context.Context, facts []models.NumericFact) error {
+	if len(facts) == 0 {
+		return nil
+	}
+	now := time.Now().UTC()
+	for i := range facts {
+		if facts[i].ID == "" {
+			facts[i].ID = uuid.NewString()
+		}
+		facts[i].CreatedAt = now
+	}
+	return s.db.WithContext(ctx).Create(&facts).Error
+}
+
+func (s *PostgresStore) ListNumericFacts(ctx context.Context, filter models.NumericFactFilter) ([]models.NumericFact, error) {
+	query := s.db.WithContext(ctx).Model(&models.NumericFact{})
+	if filter.DocumentID != "" {
+		query = query.Where("document_id = ?", filter.DocumentID)
+	}
+	if filter.Property != "" {
+		query = query.Where("property ILIKE ?", filter.Property)
+	}
+	if filter.Unit != "" {
+		query = query.Where("unit ILIKE ?", filter.Unit)
+	}
+	if filter.Min != 0 {
+		query = query.Where("value >= ?", filter.Min)
+	}
+	if filter.Max != 0 {
+		query = query.Where("value <= ?", filter.Max)
+	}
+	var facts []models.NumericFact
+	err := query.Order("created_at asc").Find(&facts).Error
+	return facts, err
+}
+
+func (s *PostgresStore) DeleteNumericFactsByDocumentID(ctx context.Context, documentID string) error {
+	return s.db.WithContext(ctx).Where("document_id = ?", documentID).Delete(&models.NumericFact{}).Error
+}
+
+func (s *PostgresStore) FindDocumentsByNumericFacts(ctx context.Context, filters []models.NumericFactFilter) ([]string, error) {
+	if len(filters) == 0 {
+		return nil, nil
+	}
+
+	query := s.db.WithContext(ctx).Table("numeric_facts")
+	for _, f := range filters {
+		sub := s.db.Table("numeric_facts").Select("document_id")
+		if f.Property != "" {
+			sub = sub.Where("property ILIKE ?", f.Property)
+		}
+		if f.Unit != "" {
+			sub = sub.Where("unit ILIKE ?", f.Unit)
+		}
+		if f.Min != 0 {
+			sub = sub.Where("value >= ?", f.Min)
+		}
+		if f.Max != 0 {
+			sub = sub.Where("value <= ?", f.Max)
+		}
+		query = query.Where("document_id IN (?)", sub)
+	}
+
+	var ids []string
+	err := query.Distinct("document_id").Pluck("document_id", &ids).Error
+	return ids, err
 }

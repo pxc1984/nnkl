@@ -22,6 +22,7 @@ type InMemoryStore struct {
 	blobs           map[string]models.Blob
 	uploads         map[string]models.Upload
 	querySessions   map[string]models.QuerySession
+	numericFacts    map[string]models.NumericFact
 	auditLogs       []models.AuditLog
 	auditLogCounter uint
 }
@@ -35,6 +36,7 @@ func NewInMemoryStore() *InMemoryStore {
 		blobs:         make(map[string]models.Blob),
 		uploads:       make(map[string]models.Upload),
 		querySessions: make(map[string]models.QuerySession),
+		numericFacts:  make(map[string]models.NumericFact),
 		auditLogs:     make([]models.AuditLog, 0),
 	}
 }
@@ -661,6 +663,106 @@ func (s *InMemoryStore) ListQuerySessions(_ context.Context, userID string, para
 		items = append(items, *cloneQuerySession(session))
 	}
 	return items, total, nil
+}
+
+func (s *InMemoryStore) CreateNumericFact(_ context.Context, fact *models.NumericFact) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if fact.ID == "" {
+		fact.ID = uuid.NewString()
+	}
+	fact.CreatedAt = time.Now().UTC()
+	s.numericFacts[fact.ID] = *fact
+	return nil
+}
+
+func (s *InMemoryStore) CreateNumericFacts(_ context.Context, facts []models.NumericFact) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	now := time.Now().UTC()
+	for i := range facts {
+		if facts[i].ID == "" {
+			facts[i].ID = uuid.NewString()
+		}
+		facts[i].CreatedAt = now
+		s.numericFacts[facts[i].ID] = facts[i]
+	}
+	return nil
+}
+
+func (s *InMemoryStore) ListNumericFacts(_ context.Context, filter models.NumericFactFilter) ([]models.NumericFact, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	var result []models.NumericFact
+	for _, fact := range s.numericFacts {
+		if filter.DocumentID != "" && fact.DocumentID != filter.DocumentID {
+			continue
+		}
+		if filter.Property != "" && !strings.EqualFold(fact.Property, filter.Property) {
+			continue
+		}
+		if filter.Unit != "" && !strings.EqualFold(fact.Unit, filter.Unit) {
+			continue
+		}
+		if filter.Min != 0 && fact.Value < filter.Min {
+			continue
+		}
+		if filter.Max != 0 && fact.Value > filter.Max {
+			continue
+		}
+		result = append(result, fact)
+	}
+	slices.SortFunc(result, func(a, b models.NumericFact) int {
+		return strings.Compare(a.ID, b.ID)
+	})
+	return result, nil
+}
+
+func (s *InMemoryStore) FindDocumentsByNumericFacts(_ context.Context, filters []models.NumericFactFilter) ([]string, error) {
+	if len(filters) == 0 {
+		return nil, nil
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	matches := make(map[string]int)
+	for _, fact := range s.numericFacts {
+		for _, filter := range filters {
+			if filter.Property != "" && !strings.EqualFold(fact.Property, filter.Property) {
+				continue
+			}
+			if filter.Unit != "" && !strings.EqualFold(fact.Unit, filter.Unit) {
+				continue
+			}
+			if filter.Min != 0 && fact.Value < filter.Min {
+				continue
+			}
+			if filter.Max != 0 && fact.Value > filter.Max {
+				continue
+			}
+			matches[fact.DocumentID]++
+		}
+	}
+
+	var result []string
+	for docID, count := range matches {
+		if count >= len(filters) {
+			result = append(result, docID)
+		}
+	}
+	slices.Sort(result)
+	return result, nil
+}
+
+func (s *InMemoryStore) DeleteNumericFactsByDocumentID(_ context.Context, documentID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for id, fact := range s.numericFacts {
+		if fact.DocumentID == documentID {
+			delete(s.numericFacts, id)
+		}
+	}
+	return nil
 }
 
 func cloneUser(user models.User) *models.User {

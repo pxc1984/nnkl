@@ -19,8 +19,17 @@ import (
 )
 
 type AskRequest struct {
-	Query string `json:"query" binding:"required"`
-	Mode  string `json:"mode"`
+	Query          string          `json:"query" binding:"required"`
+	Mode           string          `json:"mode"`
+	NumericFilters []NumericFilter `json:"numericFilters,omitempty"`
+}
+
+// NumericFilter — явный числовой фильтр от клиента.
+type NumericFilter struct {
+	Property string  `json:"property"`
+	Min      float64 `json:"min,omitempty"`
+	Max      float64 `json:"max,omitempty"`
+	Unit     string  `json:"unit,omitempty"`
 }
 
 type AskResponse struct {
@@ -57,10 +66,26 @@ func (a *DataAPI) ask(c *gin.Context) {
 		mode = "hybrid"
 	}
 
-	// Усиливаем запрос числовыми ограничениями, чтобы LLM учитывал их при поиске источников.
+	// Собираем числовые фильтры из явных полей запроса и из текста вопроса.
+	numericFilters := buildNumericFilters(req)
+	var filteredDocIDs []string
+	if len(numericFilters) > 0 {
+		ids, err := a.store.FindDocumentsByNumericFacts(c.Request.Context(), numericFilters)
+		if err != nil {
+			slog.Warn("failed to filter documents by numeric facts", "error", err)
+		} else {
+			filteredDocIDs = ids
+			slog.Info("filtered documents by numeric facts", "filters", numericFilters, "count", len(ids))
+		}
+	}
+
+	// Усиливаем запрос числовыми ограничениями и списком подходящих документов.
 	enhancedQuery := enhanceQueryWithNumericConstraints(req.Query)
+	if len(filteredDocIDs) > 0 {
+		enhancedQuery = enhanceQueryWithDocumentFilter(enhancedQuery, filteredDocIDs)
+	}
 	if enhancedQuery != req.Query {
-		slog.Info("enhanced query with numeric constraints", "original", req.Query, "enhanced", enhancedQuery)
+		slog.Info("enhanced query", "original", req.Query, "enhanced", enhancedQuery)
 	}
 
 	resp, err := a.lightrag.Query(c.Request.Context(), enhancedQuery, req.Mode)

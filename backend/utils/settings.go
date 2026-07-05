@@ -24,6 +24,10 @@ type settings struct {
 	RefreshTokenTTL    time.Duration `envconfig:"REFRESH_TOKEN_TTL" default:"720h"`
 	LightRAGServiceURL string        `envconfig:"LIGHTRAG_SERVICE_URL" default:""`
 	LightRAGAPIKey     string        `envconfig:"LIGHTRAG_API_KEY" default:""`
+	YandexLLMAPIKey    string        `envconfig:"LIGHTRAG_LLM_BINDING_API_KEY" default:""`
+	YandexLLMHost      string        `envconfig:"LIGHTRAG_LLM_BINDING_HOST" default:"https://ai.api.cloud.yandex.net/v1"`
+	YandexLLMModel     string        `envconfig:"LIGHTRAG_LLM_MODEL" default:""`
+	YandexFolderID     string        `envconfig:"YANDEX_FOLDER_ID" default:""`
 }
 
 var Settings settings

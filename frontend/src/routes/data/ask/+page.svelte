@@ -3,8 +3,8 @@
 	import PrismaticBurst from "$lib/components/PrismaticBurst.svelte";
 	import {Button} from "$lib/components/ui/button/index.js";
 	import MarkdownRenderer from "$lib/components/markdown-renderer.svelte";
-	import {ArrowUpIcon, GlobeIcon, FileTextIcon} from "@lucide/svelte";
-	import {askQuestion, type AskResponse, type Reference} from "$lib/api/ask";
+	import {ArrowUpIcon, GlobeIcon, FileTextIcon, FilterIcon, PlusIcon, XIcon} from "@lucide/svelte";
+	import {askQuestion, type AskResponse, type Reference, type NumericFilter} from "$lib/api/ask";
 	import {getApiErrorMessage} from "$lib/api/auth";
 	import {goto} from "$app/navigation";
 	import {resolve} from "$app/paths";
@@ -12,6 +12,8 @@
 
 	let prompt = $state("");
 	let useDomesticSources = $state(false);
+	let showFilters = $state(false);
+	let numericFilters = $state<NumericFilter[]>([]);
 	let isLoading = $state(false);
 	let answer = $state<AskResponse | null>(null);
 	let errorMessage = $state("");
@@ -30,7 +32,10 @@
 
 		try {
 			const mode = useDomesticSources ? "local" : "naive";
-			answer = await askQuestion(query, mode);
+			const filters = numericFilters.filter(
+				(f) => f.property.trim() !== "" && (f.min !== undefined || f.max !== undefined),
+			);
+			answer = await askQuestion(query, mode, filters.length > 0 ? filters : undefined);
 
 			if (answer.sessionId) {
 				prependQuerySession({
@@ -123,6 +128,18 @@
 		return result;
 	}
 	
+	function addNumericFilter() {
+		numericFilters = [...numericFilters, { property: "", unit: "" }];
+	}
+
+	function removeNumericFilter(index: number) {
+		numericFilters = numericFilters.filter((_, i) => i !== index);
+	}
+
+	function updateNumericFilter(index: number, patch: Partial<NumericFilter>) {
+		numericFilters = numericFilters.map((f, i) => (i === index ? { ...f, ...patch } : f));
+	}
+
 	// Navigate to document page
 	function goToDocument(id: string) {
 		// Validate the ID before navigating
@@ -218,6 +235,80 @@
 						placeholder="Какие способы закачки шахтных вод в глубокие горизонты применялись в России и за рубежом, и каковы их технико-экономические показатели?"
 						class="field-sizing-content min-h-32 w-full resize-none border-0 bg-transparent p-0 text-[17px] leading-7 text-foreground placeholder:text-muted-foreground outline-none focus-visible:ring-0"
 				></textarea>
+
+				<div class="mt-3 flex flex-col gap-3">
+					<button
+						type="button"
+						onclick={() => (showFilters = !showFilters)}
+						class="self-start inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm transition-colors {showFilters ? 'bg-foreground/10 text-foreground' : 'bg-muted/30 text-muted-foreground hover:bg-muted/50'}"
+					>
+						<FilterIcon class="size-4" />
+						Числовые фильтры
+						{#if numericFilters.length > 0}
+							<span class="ml-1 rounded-full bg-primary px-1.5 py-0.5 text-xs text-primary-foreground">
+								{numericFilters.length}
+							</span>
+						{/if}
+					</button>
+
+					{#if showFilters}
+						<div class="rounded-xl border border-border/15 bg-muted/10 p-3">
+							{#if numericFilters.length === 0}
+								<p class="text-sm text-muted-foreground">Добавьте фильтры, чтобы искать документы по числовым параметрам.</p>
+							{:else}
+								<div class="space-y-2">
+									{#each numericFilters as filter, index (index)}
+										<div class="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto_auto_auto_auto]">
+											<input
+												type="text"
+												placeholder="Свойство"
+												value={filter.property}
+												oninput={(e) => updateNumericFilter(index, { property: e.currentTarget.value })}
+												class="rounded-lg border border-border/30 bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground outline-none focus-visible:ring-1 focus-visible:ring-primary"
+											/>
+											<input
+												type="number"
+												placeholder="Мин"
+												value={filter.min ?? ""}
+												oninput={(e) => updateNumericFilter(index, { min: e.currentTarget.value === "" ? undefined : Number(e.currentTarget.value) })}
+												class="w-full rounded-lg border border-border/30 bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground outline-none focus-visible:ring-1 focus-visible:ring-primary"
+											/>
+											<input
+												type="number"
+												placeholder="Макс"
+												value={filter.max ?? ""}
+												oninput={(e) => updateNumericFilter(index, { max: e.currentTarget.value === "" ? undefined : Number(e.currentTarget.value) })}
+												class="w-full rounded-lg border border-border/30 bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground outline-none focus-visible:ring-1 focus-visible:ring-primary"
+											/>
+											<input
+												type="text"
+												placeholder="Ед. изм."
+												value={filter.unit}
+												oninput={(e) => updateNumericFilter(index, { unit: e.currentTarget.value })}
+												class="w-full rounded-lg border border-border/30 bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground outline-none focus-visible:ring-1 focus-visible:ring-primary"
+											/>
+											<button
+												type="button"
+												onclick={() => removeNumericFilter(index)}
+												class="inline-flex items-center justify-center rounded-lg p-2 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+											>
+												<XIcon class="size-4" />
+											</button>
+										</div>
+									{/each}
+								</div>
+							{/if}
+							<button
+								type="button"
+								onclick={addNumericFilter}
+								class="mt-3 inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-primary transition-colors hover:bg-primary/10"
+							>
+								<PlusIcon class="size-4" />
+								Добавить фильтр
+							</button>
+						</div>
+					{/if}
+				</div>
 
 				<div class="mt-3 flex items-center justify-between">
 					<button

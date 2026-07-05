@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/pxc1984/nnkl-backend/api"
 	auth2 "github.com/pxc1984/nnkl-backend/auth"
+	"github.com/pxc1984/nnkl-backend/extractor"
 	"github.com/pxc1984/nnkl-backend/store"
 	"github.com/pxc1984/nnkl-backend/utils"
 	"github.com/pxc1984/nnkl-backend/worker"
@@ -42,7 +43,8 @@ func RegisterDataRoutes(router gin.IRouter) {
 	lightragClient := NewLightRAGClient(utils.Settings.LightRAGServiceURL, utils.Settings.LightRAGAPIKey, client)
 
 	// Start the background processing queue.
-	globalQueue = worker.New(store.GetStore(), &ocrAdapter{client: ocrClient}, lightragClient, 100)
+	factExtractor := extractor.NewNumericFactExtractor()
+	globalQueue = worker.New(store.GetStore(), &ocrAdapter{client: ocrClient}, lightragClient, factExtractor, 100)
 	globalQueue.Start()
 
 	a := &DataAPI{
@@ -62,5 +64,6 @@ func RegisterDataRoutes(router gin.IRouter) {
 	protected.GET("/ask/session/:sessionId", a.getAskSession)  // New endpoint for getting specific session
 	protected.POST("/ask/stream", a.askStream)
 	protected.POST("/graph", a.graph)
+	protected.GET("/:documentId/numeric-facts", a.listNumericFacts)
 	registerObjectRoutes(protected, a)
 }

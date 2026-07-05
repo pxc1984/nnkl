@@ -9,6 +9,7 @@ import (
 	"github.com/pxc1984/nnkl-backend/api"
 	shared "github.com/pxc1984/nnkl-backend/api/v1/shared"
 	auth2 "github.com/pxc1984/nnkl-backend/auth"
+	"github.com/pxc1984/nnkl-backend/metrics"
 	"github.com/pxc1984/nnkl-backend/store/models"
 )
 
@@ -25,6 +26,7 @@ func (a *AuthAPI) login(c *gin.Context) {
 		return
 	}
 	if err := auth2.CheckPassword(req.Password, user.PasswordHash); err != nil {
+		metrics.AuthEventsTotal.WithLabelValues("login", "failure").Inc()
 		api.RespondInvalidCredentials(c)
 		return
 	}
@@ -56,6 +58,8 @@ func (a *AuthAPI) login(c *gin.Context) {
 		api.RespondError(c, http.StatusInternalServerError, "failed to issue tokens", "internal_error")
 		return
 	}
+
+	metrics.AuthEventsTotal.WithLabelValues("login", "success").Inc()
 
 	c.JSON(http.StatusOK, authSessionResponse{
 		AccessToken:  accessToken,

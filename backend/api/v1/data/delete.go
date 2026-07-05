@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/pxc1984/nnkl-backend/metrics"
 )
 
 func (a *DataAPI) delete(c *gin.Context) {
@@ -11,5 +12,6 @@ func (a *DataAPI) delete(c *gin.Context) {
 		respondStoreNotFound(c, err, "object not found")
 		return
 	}
+	metrics.UploadsTotal.WithLabelValues("deleted").Inc()
 	c.Status(http.StatusNoContent)
 }

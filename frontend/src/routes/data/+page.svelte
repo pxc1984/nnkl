@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { browser } from "$app/environment";
+	import { goto } from "$app/navigation";
+	import { page } from "$app/state";
 	import { getApiErrorMessage } from "$lib/api/auth";
 	import { deleteKnowledgeObject, listKnowledgeObjects } from "$lib/api/data";
 	import DataTableActions from "$lib/components/data/data-table-actions.svelte";
@@ -25,8 +27,10 @@
 		PaginationMeta,
 	} from "$lib/data/types";
 	import {
+		buildDataSearchParams,
 		formatBytes,
 		formatDateTime,
+		getStatusFromSearchParams,
 		getObjectTitle,
 	} from "$lib/data/utils";
 	import { cn } from "$lib/utils.js";
@@ -64,6 +68,7 @@
 	let typeFilter = $state("");
 	let statusFilter = $state<"" | KnowledgeObjectStatus>("");
 	let queryDebounceTimeout: number | null = null;
+	let hasHydratedFromUrl = false;
 
 	const hasActiveFilters = $derived(Boolean(appliedQuery || typeFilter || statusFilter));
 
@@ -74,6 +79,16 @@
 		}
 
 		confirmingDeleteId = null;
+	}
+
+	function getPageFromSearchParams(searchParams: URLSearchParams): number {
+		const rawPage = searchParams.get("page");
+		if (!rawPage) {
+			return 1;
+		}
+
+		const parsed = Number.parseInt(rawPage, 10);
+		return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
 	}
 
 	function armDeleteConfirmation(id: string): void {
@@ -217,6 +232,37 @@
 			return;
 		}
 
+		const searchParams = page.url.searchParams;
+		const nextQuery = searchParams.get("query")?.trim() ?? "";
+		const nextType = searchParams.get("type")?.trim() ?? "";
+		const nextStatus = getStatusFromSearchParams(searchParams);
+		const nextPage = getPageFromSearchParams(searchParams);
+
+		if (queryInput !== nextQuery) {
+			queryInput = nextQuery;
+		}
+		if (appliedQuery !== nextQuery) {
+			appliedQuery = nextQuery;
+		}
+		if (typeFilter !== nextType) {
+			typeFilter = nextType;
+		}
+		if (statusFilter !== nextStatus) {
+			statusFilter = nextStatus;
+		}
+		if (currentPage !== nextPage || pagination.pageIndex !== nextPage - 1) {
+			currentPage = nextPage;
+			pagination = { ...pagination, pageIndex: nextPage - 1 };
+		}
+
+		hasHydratedFromUrl = true;
+	});
+
+	$effect(() => {
+		if (!browser || !hasHydratedFromUrl) {
+			return;
+		}
+
 		if (queryDebounceTimeout !== null) {
 			window.clearTimeout(queryDebounceTimeout);
 		}
@@ -234,7 +280,34 @@
 	});
 
 	$effect(() => {
-		if (!browser) {
+		if (!browser || !hasHydratedFromUrl) {
+			return;
+		}
+
+		const searchParams = buildDataSearchParams({
+			page: currentPage,
+			pageSize: PAGE_SIZE,
+			query: appliedQuery || undefined,
+			type: typeFilter || undefined,
+			status: statusFilter || undefined,
+		});
+		const nextSearch = searchParams.toString();
+		const currentSearch = page.url.searchParams.toString();
+
+		if (nextSearch === currentSearch) {
+			return;
+		}
+
+		void goto(`${page.url.pathname}${nextSearch ? `?${nextSearch}` : ""}`, {
+			replaceState: true,
+			noScroll: true,
+			keepFocus: true,
+			invalidateAll: false,
+		});
+	});
+
+	$effect(() => {
+		if (!browser || !hasHydratedFromUrl) {
 			return;
 		}
 

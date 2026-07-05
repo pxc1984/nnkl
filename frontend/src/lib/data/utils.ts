@@ -2,6 +2,7 @@ import type {
   DataListParams,
   KnowledgeObject,
   KnowledgeObjectDetails,
+  KnowledgeObjectStatus,
 } from "$lib/data/types";
 
 export const DEFAULT_DATA_PAGE_SIZE = 20;
@@ -73,6 +74,10 @@ export function buildDataSearchParams(params: DataListParams): URLSearchParams {
     searchParams.set("type", params.type.trim());
   }
 
+  if (params.status?.trim()) {
+    searchParams.set("status", params.status.trim());
+  }
+
   if (params.page && params.page > 1) {
     searchParams.set("page", String(params.page));
   }
@@ -82,6 +87,22 @@ export function buildDataSearchParams(params: DataListParams): URLSearchParams {
   }
 
   return searchParams;
+}
+
+export function getStatusFromSearchParams(
+  searchParams: URLSearchParams,
+): "" | KnowledgeObjectStatus {
+  const value = searchParams.get("status")?.trim();
+
+  switch (value) {
+    case "pending":
+    case "processing":
+    case "ready":
+    case "failed":
+      return value;
+    default:
+      return "";
+  }
 }
 
 export function getMetadataEntries(

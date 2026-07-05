@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/pxc1984/nnkl-backend/api"
+	"github.com/pxc1984/nnkl-backend/metrics"
 	"github.com/pxc1984/nnkl-backend/store/models"
 	"gorm.io/gorm"
 )
@@ -36,6 +37,9 @@ func (a *DataAPI) upload(c *gin.Context) {
 			return
 		}
 		slog.Info("upload request", "filename", fileHeader.Filename, "size_bytes", fileHeader.Size, "max_mb", a.maxMB)
+
+		metrics.UploadSizeBytes.Observe(float64(fileHeader.Size))
+
 		if a.maxMB > 0 && fileHeader.Size > a.maxMB*1024*1024 {
 			api.RespondError(c, http.StatusRequestEntityTooLarge, fmt.Sprintf("uploaded file is too large (size: %.2f MB, limit: %d MB)", float64(fileHeader.Size)/(1024*1024), a.maxMB), "payload_too_large")
 			return
@@ -62,6 +66,8 @@ func (a *DataAPI) upload(c *gin.Context) {
 			api.RespondError(c, http.StatusInternalServerError, "failed to create upload", "internal_error")
 			return
 		}
+
+		metrics.UploadsTotal.WithLabelValues("pending").Inc()
 
 		a.queue.Notify()
 

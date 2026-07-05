@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/pxc1984/nnkl-backend/metrics"
 	"github.com/pxc1984/nnkl-backend/store"
 	"github.com/pxc1984/nnkl-backend/store/models"
 )
@@ -141,7 +142,9 @@ func (q *Queue) processUpload(ctx context.Context, upload models.Upload) {
 		q.failUpload(ctx, upload.ID, "unsupported file type: "+upload.InputBlob.FileType)
 	}
 
-	slog.Info("upload processing finished", "upload_id", upload.ID, "type", upload.InputBlob.FileType, "duration", time.Since(start))
+	duration := time.Since(start)
+	metrics.UploadProcessingDuration.Observe(duration.Seconds())
+	slog.Info("upload processing finished", "upload_id", upload.ID, "type", upload.InputBlob.FileType, "duration", duration)
 }
 
 func (q *Queue) processMarkdown(ctx context.Context, upload models.Upload) {
@@ -156,6 +159,7 @@ func (q *Queue) processMarkdown(ctx context.Context, upload models.Upload) {
 	}); err != nil {
 		slog.Error("markdown finalize failed", "upload_id", upload.ID, "error", err)
 	}
+	metrics.UploadsTotal.WithLabelValues("completed").Inc()
 
 	if q.indexer != nil && q.indexer.IsConfigured() {
 		source := upload.ID + ".md"
@@ -197,6 +201,7 @@ func (q *Queue) processSimple(ctx context.Context, upload models.Upload) {
 		slog.Error("simple extraction finalize failed", "upload_id", upload.ID, "error", err)
 		return
 	}
+	metrics.UploadsTotal.WithLabelValues("completed").Inc()
 
 	if q.indexer != nil && q.indexer.IsConfigured() {
 		source := upload.ID + ".md"
@@ -228,6 +233,7 @@ func (q *Queue) processOCR(ctx context.Context, upload models.Upload) {
 		}); err != nil {
 			slog.Error("ocr processing: failed to clear claim", "upload_id", upload.ID, "error", err)
 		}
+		metrics.UploadsTotal.WithLabelValues("completed").Inc()
 	} else {
 		q.failUpload(ctx, upload.ID, "ocr parse finished without output blob")
 		return
@@ -250,6 +256,7 @@ func (q *Queue) failUpload(ctx context.Context, uploadID, errorMessage string) {
 	}); err != nil {
 		slog.Error("failed to update failed upload", "upload_id", uploadID, "error", err)
 	}
+	metrics.UploadsTotal.WithLabelValues("failed").Inc()
 	slog.Error("upload processing failed", "upload_id", uploadID, "error", errorMessage)
 }
 

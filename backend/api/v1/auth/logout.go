@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/pxc1984/nnkl-backend/api"
 	auth2 "github.com/pxc1984/nnkl-backend/auth"
+	"github.com/pxc1984/nnkl-backend/metrics"
 )
 
 func (a *AuthAPI) logout(c *gin.Context) {
@@ -31,6 +32,7 @@ func (a *AuthAPI) logout(c *gin.Context) {
 		api.RespondError(c, http.StatusForbidden, "session does not belong to user", "forbidden")
 		return
 	}
+	metrics.AuthEventsTotal.WithLabelValues("logout", "success").Inc()
 	c.Status(http.StatusNoContent)
 }
 
@@ -40,5 +42,6 @@ func (a *AuthAPI) logoutAll(c *gin.Context) {
 		api.RespondError(c, http.StatusInternalServerError, "failed to revoke sessions", "internal_error")
 		return
 	}
+	metrics.AuthEventsTotal.WithLabelValues("logout_all", "success").Inc()
 	c.Status(http.StatusNoContent)
 }

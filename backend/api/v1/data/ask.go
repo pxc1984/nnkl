@@ -14,6 +14,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/pxc1984/nnkl-backend/api"
+	"github.com/pxc1984/nnkl-backend/metrics"
 	"github.com/pxc1984/nnkl-backend/store/models"
 )
 
@@ -51,6 +52,11 @@ func (a *DataAPI) ask(c *gin.Context) {
 		return
 	}
 
+	mode := req.Mode
+	if mode == "" {
+		mode = "hybrid"
+	}
+
 	// Усиливаем запрос числовыми ограничениями, чтобы LLM учитывал их при поиске источников.
 	enhancedQuery := enhanceQueryWithNumericConstraints(req.Query)
 	if enhancedQuery != req.Query {
@@ -59,9 +65,12 @@ func (a *DataAPI) ask(c *gin.Context) {
 
 	resp, err := a.lightrag.Query(c.Request.Context(), enhancedQuery, req.Mode)
 	if err != nil {
+		metrics.AskQueriesTotal.WithLabelValues(mode, "error").Inc()
 		api.RespondError(c, http.StatusServiceUnavailable, "failed to query knowledge base: "+err.Error(), "service_unavailable")
 		return
 	}
+
+	metrics.AskQueriesTotal.WithLabelValues(mode, "success").Inc()
 
 	// Process references to enhance with document information
 	processedReferences, err := a.processReferences(c.Request.Context(), resp.References)
@@ -202,15 +211,23 @@ func (a *DataAPI) askStream(c *gin.Context) {
 		api.RespondError(c, http.StatusBadRequest, "invalid request body", "bad_request")
 		return
 	}
+
+	mode := req.Mode
+	if mode == "" {
+		mode = "hybrid"
+	}
+
 	if !a.lightrag.IsConfigured() {
 		api.RespondError(c, http.StatusServiceUnavailable, "lightrag service is not configured", "service_unavailable")
 		return
 	}
 	resp, err := a.lightrag.QueryStream(c.Request.Context(), req.Query, req.Mode)
 	if err != nil {
+		metrics.AskQueriesTotal.WithLabelValues(mode, "stream_error").Inc()
 		api.RespondError(c, http.StatusServiceUnavailable, "failed to query knowledge base: "+err.Error(), "service_unavailable")
 		return
 	}
+	metrics.AskQueriesTotal.WithLabelValues(mode, "stream_success").Inc()
 	defer resp.Body.Close()
 	c.Header("Content-Type", "application/x-ndjson")
 	c.Header("Cache-Control", "no-cache")

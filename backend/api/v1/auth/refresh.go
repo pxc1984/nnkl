@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/pxc1984/nnkl-backend/api"
 	auth2 "github.com/pxc1984/nnkl-backend/auth"
+	"github.com/pxc1984/nnkl-backend/metrics"
 	"github.com/pxc1984/nnkl-backend/store/models"
 )
 
@@ -19,6 +20,7 @@ func (a *AuthAPI) refresh(c *gin.Context) {
 
 	session, err := a.store.GetSessionByRefreshTokenHash(c.Request.Context(), auth2.HashToken(req.RefreshToken))
 	if err != nil || session.ExpiresAt.Before(time.Now().UTC()) {
+		metrics.AuthEventsTotal.WithLabelValues("refresh", "failure").Inc()
 		api.RespondError(c, http.StatusUnauthorized, "invalid refresh token", "unauthorized")
 		return
 	}
@@ -44,6 +46,8 @@ func (a *AuthAPI) refresh(c *gin.Context) {
 		api.RespondError(c, http.StatusInternalServerError, "failed to issue tokens", "internal_error")
 		return
 	}
+
+	metrics.AuthEventsTotal.WithLabelValues("refresh", "success").Inc()
 
 	c.JSON(http.StatusOK, tokenPairResponse{
 		AccessToken:  accessToken,

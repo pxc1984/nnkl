@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/pxc1984/nnkl-backend/api"
+	"github.com/pxc1984/nnkl-backend/metrics"
 )
 
 // GraphNodeType represents the canonical node types used by the frontend legend.
@@ -402,9 +403,11 @@ func (a *DataAPI) graph(c *gin.Context) {
 
 	resp, err := a.lightrag.QueryData(c.Request.Context(), req.Query, mode)
 	if err != nil {
+		metrics.GraphQueriesTotal.WithLabelValues("error").Inc()
 		api.RespondError(c, http.StatusServiceUnavailable, "failed to query knowledge graph: "+err.Error(), "service_unavailable")
 		return
 	}
 
+	metrics.GraphQueriesTotal.WithLabelValues("success").Inc()
 	c.JSON(http.StatusOK, convertLightRAGDataToGraph(resp, mode))
 }

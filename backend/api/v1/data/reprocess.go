@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/pxc1984/nnkl-backend/api"
 	shared "github.com/pxc1984/nnkl-backend/api/v1/shared"
+	"github.com/pxc1984/nnkl-backend/metrics"
 	"github.com/pxc1984/nnkl-backend/store/models"
 )
 
@@ -39,6 +40,8 @@ func (a *DataAPI) reprocess(c *gin.Context) {
 		return
 	}
 	a.queue.Notify()
+
+	metrics.UploadsTotal.WithLabelValues("reprocess").Inc()
 
 	c.JSON(http.StatusAccepted, shared.KnowledgeObject{
 		KnowledgeObjectResponse: shared.ToKnowledgeObjectResponse(&updated.InputBlob),

@@ -61,6 +61,8 @@ jobs:
             ocr \
             lightrag \
             postgres \
+            prometheus \
+            grafana \
             "$SSH_USER@$SSH_HOST:$DEPLOY_PATH"
 
       - name: Deploy to server

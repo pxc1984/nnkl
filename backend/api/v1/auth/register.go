@@ -9,6 +9,7 @@ import (
 	"github.com/pxc1984/nnkl-backend/api"
 	shared "github.com/pxc1984/nnkl-backend/api/v1/shared"
 	auth2 "github.com/pxc1984/nnkl-backend/auth"
+	"github.com/pxc1984/nnkl-backend/metrics"
 	"github.com/pxc1984/nnkl-backend/store/models"
 	"gorm.io/gorm"
 )
@@ -51,6 +52,9 @@ func (a *AuthAPI) register(c *gin.Context) {
 		api.RespondError(c, http.StatusInternalServerError, "failed to create user", "internal_error")
 		return
 	}
+
+	metrics.AuthEventsTotal.WithLabelValues("register", "success").Inc()
+	metrics.UsersTotal.Inc()
 
 	c.JSON(http.StatusCreated, shared.ToUserResponse(user))
 }

@@ -14,8 +14,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/pxc1984/nnkl-backend/api"
 	apiv1 "github.com/pxc1984/nnkl-backend/api/v1"
+	"github.com/pxc1984/nnkl-backend/metrics"
 	store2 "github.com/pxc1984/nnkl-backend/store"
 	"github.com/pxc1984/nnkl-backend/utils"
 )
@@ -38,6 +40,10 @@ func main() {
 	}()
 
 	router := gin.Default()
+
+	// Prometheus metrics
+	router.Use(metrics.InstrumentMiddleware())
+	router.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
 	v1 := router.Group("/api/v1")
 	v1.Use(api.AuditMiddleware())

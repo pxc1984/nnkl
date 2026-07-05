@@ -1,4 +1,5 @@
 <script lang="ts">
+	import {browser} from "$app/environment";
 	import {prependQuerySession} from "$lib/ask/query-sessions";
 	import PrismaticBurst from "$lib/components/PrismaticBurst.svelte";
 	import {Button} from "$lib/components/ui/button/index.js";
@@ -9,6 +10,15 @@
 	import {goto} from "$app/navigation";
 	import {resolve} from "$app/paths";
 	import {SvelteSet} from "svelte/reactivity";
+	import {onMount} from "svelte";
+
+	interface WebGLDebugRendererInfo {
+		UNMASKED_RENDERER_WEBGL: number;
+	}
+
+	interface NavigatorWithDeviceMemory extends Navigator {
+		deviceMemory?: number;
+	}
 
 	let prompt = $state("");
 	let useDomesticSources = $state(false);
@@ -16,6 +26,45 @@
 	let answer = $state<AskResponse | null>(null);
 	let errorMessage = $state("");
 	let hasSubmittedPrompt = $state(false);
+	let showBurst = $state(false);
+
+	onMount(() => {
+		showBurst = hasGoodDiscreteGpu();
+	});
+
+	function hasGoodDiscreteGpu(): boolean {
+		if (!browser) {
+			return false;
+		}
+
+		const canvas = document.createElement("canvas");
+		const gl = canvas.getContext("webgl") ?? canvas.getContext("experimental-webgl");
+		if (!gl) {
+			return false;
+		}
+
+		const hasWebgl2 = !!canvas.getContext("webgl2");
+
+		const debugInfo = gl.getExtension("WEBGL_debug_renderer_info") as WebGLDebugRendererInfo | null;
+		const renderer = debugInfo
+			? gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL)
+			: gl.getParameter(gl.RENDERER);
+
+		if (typeof renderer !== "string") {
+			return false;
+		}
+
+		const normalizedRenderer = renderer.toLowerCase();
+		const isSoftwareRenderer = /(llvmpipe|softpipe|swiftshader|software|virgl|basic render)/.test(normalizedRenderer);
+		const looksIntegrated = /(intel|iris|uhd|apple|mali|adreno|powervr)/.test(normalizedRenderer);
+		const looksDiscrete = /(nvidia|geforce|quadro|rtx|gtx|tesla|amd|radeon|firepro|w[0-9]{3,4})/.test(normalizedRenderer);
+		const looksLowEndDiscrete = /(mx\d+|gt\s?\d+|rx\s?5\d{2}|r7\s|r5\s|pro\s?4\d{2}|t\d{3,4})/.test(normalizedRenderer);
+		const browserNavigator = navigator as NavigatorWithDeviceMemory;
+		const hasEnoughCpu = navigator.hardwareConcurrency >= 8;
+		const hasEnoughMemory = (browserNavigator.deviceMemory ?? 0) >= 8;
+
+		return !isSoftwareRenderer && !looksIntegrated && looksDiscrete && !looksLowEndDiscrete && hasWebgl2 && (hasEnoughCpu || hasEnoughMemory);
+	}
 
 	async function handleSubmit() {
 		const query = prompt.trim();
@@ -139,18 +188,20 @@
 <main class="relative flex flex-1 overflow-hidden bg-[#101010]">
 	{#if !hasSubmittedPrompt}
 		<div class="pointer-events-none absolute inset-0">
-			<div class="absolute inset-0 opacity-75">
-				<PrismaticBurst
-					intensity={1.75}
-					speed={0.5}
-					animationType="rotate3d"
-					distort={0.35}
-					hoverDampness={0.12}
-					rayCount={8}
-					colors={["#38bdf8", "#818cf8", "#c084fc", "#f472b6"]}
-					mixBlendMode="screen"
-				/>
-			</div>
+			{#if showBurst}
+				<div class="absolute inset-0 opacity-75">
+					<PrismaticBurst
+						intensity={1.75}
+						speed={0.5}
+						animationType="rotate3d"
+						distort={0.35}
+						hoverDampness={0.12}
+						rayCount={8}
+						colors={["#38bdf8", "#818cf8", "#c084fc", "#f472b6"]}
+						mixBlendMode="screen"
+					/>
+				</div>
+			{/if}
 			<div class="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(8,12,18,0)_0%,_rgba(8,12,18,0.5)_42%,_rgba(8,12,18,0.88)_100%)]"></div>
 		</div>
 	{/if}

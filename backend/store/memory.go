@@ -734,10 +734,7 @@ func (s *InMemoryStore) FindDocumentsByNumericFacts(_ context.Context, filters [
 			if filter.Unit != "" && !strings.EqualFold(fact.Unit, filter.Unit) {
 				continue
 			}
-			if filter.Min != 0 && fact.Value < filter.Min {
-				continue
-			}
-			if filter.Max != 0 && fact.Value > filter.Max {
+			if !numericFactMatchesRange(fact, filter) {
 				continue
 			}
 			matches[fact.DocumentID]++
@@ -752,6 +749,33 @@ func (s *InMemoryStore) FindDocumentsByNumericFacts(_ context.Context, filters [
 	}
 	slices.Sort(result)
 	return result, nil
+}
+
+// numericFactMatchesRange проверяет, пересекается ли значение факта (или его
+// диапазон при operator=between) с диапазоном фильтра [min, max].
+func numericFactMatchesRange(fact models.NumericFact, filter models.NumericFactFilter) bool {
+	factMin := fact.Value
+	factMax := fact.Value
+	if fact.Operator == "between" && fact.Value2 != 0 {
+		factMax = fact.Value2
+		if factMin > factMax {
+			factMin, factMax = factMax, factMin
+		}
+	}
+
+	filterMin := filter.Min
+	filterMax := filter.Max
+	if filterMax != 0 && filterMin > filterMax {
+		filterMin, filterMax = filterMax, filterMin
+	}
+
+	if filterMin != 0 && factMax < filterMin {
+		return false
+	}
+	if filterMax != 0 && factMin > filterMax {
+		return false
+	}
+	return true
 }
 
 func (s *InMemoryStore) DeleteNumericFactsByDocumentID(_ context.Context, documentID string) error {

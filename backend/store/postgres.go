@@ -672,11 +672,15 @@ func (s *PostgresStore) FindDocumentsByNumericFacts(ctx context.Context, filters
 		if f.Unit != "" {
 			sub = sub.Where("unit ILIKE ?", f.Unit)
 		}
-		if f.Min != 0 {
-			sub = sub.Where("value >= ?", f.Min)
-		}
-		if f.Max != 0 {
-			sub = sub.Where("value <= ?", f.Max)
+		if f.Min != 0 || f.Max != 0 {
+			factMin := "CASE WHEN operator = 'between' AND value2 <> 0 THEN LEAST(value, value2) ELSE value END"
+			factMax := "CASE WHEN operator = 'between' AND value2 <> 0 THEN GREATEST(value, value2) ELSE value END"
+			if f.Min != 0 {
+				sub = sub.Where(factMax+" >= ?", f.Min)
+			}
+			if f.Max != 0 {
+				sub = sub.Where(factMin+" <= ?", f.Max)
+			}
 		}
 		query = query.Where("document_id IN (?)", sub)
 	}

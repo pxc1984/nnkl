@@ -113,3 +113,36 @@ func TestInMemoryStore_FindDocumentsByNumericFacts(t *testing.T) {
 		t.Fatalf("expected [doc-1] for multi-filter, got %v", ids)
 	}
 }
+
+func TestInMemoryStore_FindDocumentsByNumericFacts_Between(t *testing.T) {
+	ctx := context.Background()
+	s := NewInMemoryStore()
+
+	facts := []models.NumericFact{
+		{DocumentID: "doc-1", Property: "температура", Value: 100, Value2: 200, Unit: "°c", Operator: "between"},
+		{DocumentID: "doc-2", Property: "температура", Value: 250, Value2: 300, Unit: "°c", Operator: "between"},
+	}
+	if err := s.CreateNumericFacts(ctx, facts); err != nil {
+		t.Fatalf("CreateNumericFacts: %v", err)
+	}
+
+	ids, err := s.FindDocumentsByNumericFacts(ctx, []models.NumericFactFilter{
+		{Property: "температура", Min: 150, Max: 180, Unit: "°c"},
+	})
+	if err != nil {
+		t.Fatalf("FindDocumentsByNumericFacts: %v", err)
+	}
+	if len(ids) != 1 || ids[0] != "doc-1" {
+		t.Fatalf("expected [doc-1], got %v", ids)
+	}
+
+	ids, err = s.FindDocumentsByNumericFacts(ctx, []models.NumericFactFilter{
+		{Property: "температура", Min: 220, Max: 280, Unit: "°c"},
+	})
+	if err != nil {
+		t.Fatalf("FindDocumentsByNumericFacts: %v", err)
+	}
+	if len(ids) != 1 || ids[0] != "doc-2" {
+		t.Fatalf("expected [doc-2], got %v", ids)
+	}
+}

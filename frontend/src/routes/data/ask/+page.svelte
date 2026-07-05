@@ -227,8 +227,17 @@
 							: "inline-flex items-center gap-2 rounded-full bg-muted/30 px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/50"}
 							onclick={() => (useDomesticSources = !useDomesticSources)}
 					>
-						<GlobeIcon class="size-4" />
-						{useDomesticSources ? "Отечественные источники" : "Все источники"}
+						{#if useDomesticSources}
+							<span class="flag-tricolor size-4 rounded-sm">
+								<span class="flag-stripe flag-stripe--white"></span>
+								<span class="flag-stripe flag-stripe--blue"></span>
+								<span class="flag-stripe flag-stripe--red"></span>
+							</span>
+							Отечественные источники
+						{:else}
+							<GlobeIcon class="size-4" />
+							Все источники
+						{/if}
 					</button>
 
 					<Button
@@ -249,3 +258,42 @@
 		</div>
 	</section>
 </main>
+
+<style>
+	.flag-tricolor {
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+		flex-shrink: 0;
+		animation: flag-wave 1.8s ease-in-out infinite;
+	}
+
+	.flag-stripe {
+		flex: 1;
+		width: 100%;
+	}
+
+	.flag-stripe--white {
+		background: #fff;
+	}
+
+	.flag-stripe--blue {
+		background: #0039a6;
+	}
+
+	.flag-stripe--red {
+		background: #d52b1e;
+	}
+
+	@keyframes flag-wave {
+		0%, 100% {
+			transform: skewX(0deg) scaleY(1);
+		}
+		25% {
+			transform: skewX(-2deg) scaleY(1.06);
+		}
+		75% {
+			transform: skewX(2deg) scaleY(1.06);
+		}
+	}
+</style>

@@ -238,22 +238,14 @@
 		const nextStatus = getStatusFromSearchParams(searchParams);
 		const nextPage = getPageFromSearchParams(searchParams);
 
-		if (queryInput !== nextQuery) {
-			queryInput = nextQuery;
-		}
-		if (appliedQuery !== nextQuery) {
-			appliedQuery = nextQuery;
-		}
-		if (typeFilter !== nextType) {
-			typeFilter = nextType;
-		}
-		if (statusFilter !== nextStatus) {
-			statusFilter = nextStatus;
-		}
-		if (currentPage !== nextPage || pagination.pageIndex !== nextPage - 1) {
-			currentPage = nextPage;
-			pagination = { ...pagination, pageIndex: nextPage - 1 };
-		}
+		// Depend only on the URL here. Reading local filters would rerun this
+		// effect on every keystroke and restore the previous URL query.
+		queryInput = nextQuery;
+		appliedQuery = nextQuery;
+		typeFilter = nextType;
+		statusFilter = nextStatus;
+		currentPage = nextPage;
+		pagination = { pageIndex: nextPage - 1, pageSize: PAGE_SIZE };
 
 		hasHydratedFromUrl = true;
 	});

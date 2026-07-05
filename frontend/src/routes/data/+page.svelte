@@ -33,7 +33,7 @@
 	import { createRawSnippet } from "svelte";
 	import { ChevronLeftIcon, ChevronRightIcon } from "@lucide/svelte";
 
-	const PAGE_SIZE = 20;
+	const PAGE_SIZE = 10;
 	const FILE_TYPE_OPTIONS = [
 		{ value: "", label: "Все типы" },
 		{ value: "pdf", label: "PDF" },

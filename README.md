@@ -24,11 +24,11 @@
 
 ## Демо
 
-![Demo](docs/images/screenshot-ask.png)
+![Demo](docs/images/demogif.gif)
 
 ## Архитектура
 
-![Architecture](docs/images/architecture.png)
+![Architecture](docs/images/archscreen.png)
 
 ## Стек технологий
 

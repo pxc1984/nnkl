@@ -58,6 +58,7 @@ export async function listKnowledgeObjects(
         query: params.query,
         type: params.type,
         status: params.status,
+        language: params.language,
       },
     },
   );

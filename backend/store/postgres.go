@@ -263,7 +263,7 @@ func (s *PostgresStore) ListUploads(ctx context.Context, params models.ListUploa
 		pageSize = 100
 	}
 
-	query := s.db.WithContext(ctx).Model(&models.Upload{}).Joins("InputBlob")
+	query := s.db.WithContext(ctx).Model(&models.Upload{}).Joins("InputBlob").Joins(`LEFT JOIN blobs AS language_blob ON language_blob.id = "uploads"."output_blob"`)
 	if params.Query != "" {
 		query = query.Where(`"InputBlob"."filename" ILIKE ?`, "%"+params.Query+"%")
 	}
@@ -272,6 +272,16 @@ func (s *PostgresStore) ListUploads(ctx context.Context, params models.ListUploa
 	}
 	if params.Status != "" {
 		query = query.Where(`"uploads"."status" = ?`, params.Status)
+	}
+	if params.Language != "" {
+		switch strings.ToLower(params.Language) {
+		case "ru":
+			query = query.Where(`LOWER("uploads"."language") = 'ru' OR (LOWER(COALESCE("uploads"."language", 'auto')) = 'auto' AND convert_from(language_blob.content, 'UTF8') ~ '[А-Яа-яЁё]')`)
+		case "en":
+			query = query.Where(`LOWER("uploads"."language") = 'en' OR (LOWER(COALESCE("uploads"."language", 'auto')) = 'auto' AND language_blob.content IS NOT NULL AND convert_from(language_blob.content, 'UTF8') !~ '[А-Яа-яЁё]')`)
+		case "auto":
+			query = query.Where(`LOWER(COALESCE("uploads"."language", 'auto')) = 'auto' AND language_blob.content IS NULL`)
+		}
 	}
 
 	var total int64

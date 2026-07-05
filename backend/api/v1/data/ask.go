@@ -19,8 +19,9 @@ import (
 )
 
 type AskRequest struct {
-	Query string `json:"query" binding:"required"`
-	Mode  string `json:"mode"`
+	Query    string `json:"query" binding:"required"`
+	Mode     string `json:"mode"`
+	Language string `json:"language,omitempty"`
 }
 
 type AskResponse struct {
@@ -38,6 +39,7 @@ type EnrichedReference struct {
 	CreatedAt  time.Time `json:"createdAt"`
 	Number     int       `json:"number,omitempty"`
 	SourcePath string    `json:"sourcePath,omitempty"`
+	Language   string    `json:"language,omitempty"`
 }
 
 func (a *DataAPI) ask(c *gin.Context) {
@@ -63,7 +65,14 @@ func (a *DataAPI) ask(c *gin.Context) {
 		slog.Info("enhanced query with numeric constraints", "original", req.Query, "enhanced", enhancedQuery)
 	}
 
-	resp, err := a.lightrag.Query(c.Request.Context(), enhancedQuery, req.Mode)
+	var resp *LightRAGQueryResponse
+	var err error
+	language := normalizeLanguageFilter(req.Language)
+	if language != "" {
+		resp, err = a.queryByLanguage(c.Request.Context(), enhancedQuery, language)
+	} else {
+		resp, err = a.lightrag.Query(c.Request.Context(), enhancedQuery, req.Mode)
+	}
 	if err != nil {
 		metrics.AskQueriesTotal.WithLabelValues(mode, "error").Inc()
 		api.RespondError(c, http.StatusServiceUnavailable, "failed to query knowledge base: "+err.Error(), "service_unavailable")
@@ -73,7 +82,7 @@ func (a *DataAPI) ask(c *gin.Context) {
 	metrics.AskQueriesTotal.WithLabelValues(mode, "success").Inc()
 
 	// Process references to enhance with document information
-	processedReferences, err := a.processReferences(c.Request.Context(), resp.References)
+	processedReferences, err := a.processReferences(c.Request.Context(), resp.References, normalizeLanguageFilter(req.Language))
 	if err != nil {
 		// Log the error but continue with original references
 		fmt.Printf("Warning: failed to process references: %v\n", err)
@@ -115,9 +124,66 @@ func (a *DataAPI) ask(c *gin.Context) {
 	c.JSON(http.StatusOK, askResp)
 }
 
+type languageFilteredChunk struct {
+	Content  string `json:"content"`
+	FilePath string `json:"file_path"`
+}
+
+func (a *DataAPI) queryByLanguage(ctx context.Context, query, language string) (*LightRAGQueryResponse, error) {
+	data, err := a.lightrag.QueryData(ctx, query, "naive")
+	if err != nil {
+		return nil, err
+	}
+
+	const maxContextChars = 60000
+	var contextBuilder strings.Builder
+	rawReferences := make([]map[string]string, 0)
+	seenDocuments := make(map[string]struct{})
+	for _, rawChunk := range data.Data.Chunks {
+		var chunk languageFilteredChunk
+		if err := json.Unmarshal(rawChunk, &chunk); err != nil || chunk.Content == "" {
+			continue
+		}
+		documentID := extractDocumentID(chunk.FilePath)
+		if documentID == "" {
+			continue
+		}
+		upload, err := a.store.GetUploadByID(ctx, documentID)
+		if err != nil || models.ResolveUploadLanguage(upload) != language {
+			continue
+		}
+		if contextBuilder.Len()+len(chunk.Content) > maxContextChars {
+			break
+		}
+		contextBuilder.WriteString("\n\n--- SOURCE: ")
+		contextBuilder.WriteString(chunk.FilePath)
+		contextBuilder.WriteString(" ---\n")
+		contextBuilder.WriteString(chunk.Content)
+		if _, exists := seenDocuments[documentID]; !exists {
+			seenDocuments[documentID] = struct{}{}
+			rawReferences = append(rawReferences, map[string]string{"file_path": chunk.FilePath})
+		}
+	}
+
+	if contextBuilder.Len() == 0 {
+		return &LightRAGQueryResponse{Response: "No relevant documents were found for the selected language.[no-context]", References: json.RawMessage(`[]`)}, nil
+	}
+
+	prompt := "Answer the question using only the context below. Do not use outside knowledge. Answer in the language of the question.\n\nQUESTION:\n" + query + "\n\nCONTEXT:" + contextBuilder.String()
+	result, err := a.lightrag.Query(ctx, prompt, "bypass")
+	if err != nil {
+		return nil, err
+	}
+	result.References, err = json.Marshal(rawReferences)
+	if err != nil {
+		return nil, fmt.Errorf("marshal filtered references: %w", err)
+	}
+	return result, nil
+}
+
 // processReferences превращает сырые references от LightRAG в единый массив
 // обогащённых источников с id, именем файла, типом и датой загрузки.
-func (a *DataAPI) processReferences(ctx context.Context, rawRefs json.RawMessage) (json.RawMessage, error) {
+func (a *DataAPI) processReferences(ctx context.Context, rawRefs json.RawMessage, languageFilter ...string) (json.RawMessage, error) {
 	if len(rawRefs) == 0 {
 		return rawRefs, nil
 	}
@@ -134,12 +200,24 @@ func (a *DataAPI) processReferences(ctx context.Context, rawRefs json.RawMessage
 	}
 
 	enriched := make([]EnrichedReference, 0, len(docIDs))
+	requestedLanguage := ""
+	if len(languageFilter) > 0 {
+		requestedLanguage = normalizeLanguageFilter(languageFilter[0])
+	}
 	for id, sourcePath := range docIDs {
 		ref := EnrichedReference{ID: id, SourcePath: sourcePath}
-		if blob, err := a.store.GetBlobByID(ctx, id); err == nil {
+		if upload, err := a.store.GetUploadByID(ctx, id); err == nil {
+			ref.Filename = upload.InputBlob.Filename
+			ref.Type = upload.InputBlob.FileType
+			ref.CreatedAt = upload.InputBlob.CreatedAt
+			ref.Language = models.ResolveUploadLanguage(upload)
+		} else if blob, err := a.store.GetBlobByID(ctx, id); err == nil {
 			ref.Filename = blob.Filename
 			ref.Type = blob.FileType
 			ref.CreatedAt = blob.CreatedAt
+		}
+		if requestedLanguage != "" && ref.Language != requestedLanguage {
+			continue
 		}
 		enriched = append(enriched, ref)
 	}

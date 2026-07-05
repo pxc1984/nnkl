@@ -69,6 +69,7 @@ type ListUploadsParams struct {
 	Query    string
 	FileType string
 	Status   string
+	Language string
 }
 
 type UpdateUploadParams struct {

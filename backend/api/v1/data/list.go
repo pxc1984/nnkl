@@ -20,6 +20,7 @@ func (a *DataAPI) list(c *gin.Context) {
 		Query:    strings.TrimSpace(c.Query("query")),
 		FileType: strings.ToLower(strings.TrimSpace(c.Query("type"))),
 		Status:   normalizeUploadListStatus(strings.ToLower(strings.TrimSpace(c.Query("status")))),
+		Language: normalizeLanguageFilter(c.Query("language")),
 	})
 	if err != nil {
 		api.RespondError(c, http.StatusInternalServerError, "failed to list objects", "internal_error")
@@ -43,6 +44,16 @@ func (a *DataAPI) list(c *gin.Context) {
 			TotalPages: totalPages,
 		},
 	})
+}
+
+func normalizeLanguageFilter(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	switch value {
+	case "ru", "en", "auto":
+		return value
+	default:
+		return ""
+	}
 }
 
 func normalizeUploadListStatus(value string) string {

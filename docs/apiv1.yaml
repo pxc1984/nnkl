@@ -205,6 +205,15 @@ paths:
           - ready
           - failed
         description: Фильтр по статусу обработки
+      - in: query
+        name: language
+        schema:
+          type: string
+          enum:
+          - ru
+          - en
+          - auto
+        description: Фильтр по языку документа
       responses:
         '200':
           description: Страница со списком объектов
@@ -677,6 +686,12 @@ components:
           type: string
           default: naive
           description: Режим поиска (naive, local, global, hybrid)
+        language:
+          type: string
+          enum:
+          - ru
+          - en
+          description: Ограничить ответ документами выбранного языка
     AskResponse:
       type: object
       required:
@@ -798,6 +813,13 @@ components:
           status:
             type: string
             description: Статус обработки (pending, processing, completed, failed)
+          language:
+            type: string
+            enum:
+            - ru
+            - en
+            - auto
+            description: Определенный язык документа
     PaginationMeta:
       type: object
       required:
@@ -823,7 +845,7 @@ components:
         items:
           type: array
           items:
-            $ref: '#/components/schemas/KnowledgeObjectResponse'
+            $ref: '#/components/schemas/KnowledgeObject'
         meta:
           $ref: '#/components/schemas/PaginationMeta'
     KnowledgeObjectDetails:

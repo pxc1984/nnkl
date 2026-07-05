@@ -29,8 +29,8 @@
 		answer = null;
 
 		try {
-			const mode = useDomesticSources ? "local" : "naive";
-			answer = await askQuestion(query, mode);
+			const mode = "naive";
+			answer = await askQuestion(query, mode, useDomesticSources ? "ru" : undefined);
 
 			if (answer.sessionId) {
 				prependQuerySession({
@@ -94,6 +94,7 @@
 			let filename = '';
 			let type = '';
 			let createdAt = '';
+			let language = '';
 
 			if (typeof ref.id === 'string' && isValidDocumentId(ref.id)) {
 				// Enriched format returned by backend.
@@ -101,6 +102,7 @@
 				filename = typeof ref.filename === 'string' ? ref.filename : '';
 				type = typeof ref.type === 'string' ? ref.type : '';
 				createdAt = typeof ref.createdAt === 'string' ? ref.createdAt : '';
+				language = typeof ref.language === 'string' ? ref.language : '';
 			} else {
 				// Fallback for legacy LightRAG-shaped references.
 				const legacyRef = ref as Record<string, unknown>;
@@ -117,7 +119,7 @@
 
 			if (!id || seen.has(id)) continue;
 			seen.add(id);
-			result.push({ id, filename, type, createdAt, link: `/data/${id}` });
+			result.push({ id, filename, type, createdAt, language, link: `/data/${id}` });
 		}
 
 		return result;

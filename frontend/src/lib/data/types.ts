@@ -70,6 +70,7 @@ export type DataListParams = {
   query?: string;
   type?: string;
   status?: KnowledgeObjectStatus;
+  language?: string;
 };
 
 export type DataUploadParams = {

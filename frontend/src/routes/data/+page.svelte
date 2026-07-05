@@ -2,10 +2,12 @@
 	import { browser } from "$app/environment";
 	import { goto } from "$app/navigation";
 	import { page } from "$app/state";
+	import { resolve } from "$app/paths";
 	import { getApiErrorMessage } from "$lib/api/auth";
 	import { deleteKnowledgeObject, listKnowledgeObjects } from "$lib/api/data";
 	import DataTableActions from "$lib/components/data/data-table-actions.svelte";
 	import DataStatusBadge from "$lib/components/data/data-status-badge.svelte";
+	import DataLanguageBadge from "$lib/components/data/data-language-badge.svelte";
 	import { Button } from "$lib/components/ui/button/index.js";
 	import { Input } from "$lib/components/ui/input/index.js";
 	import { Skeleton } from "$lib/components/ui/skeleton/index.js";
@@ -52,6 +54,12 @@
 		{ value: "ready", label: "Готов" },
 		{ value: "failed", label: "Ошибка" },
 	];
+	const LANGUAGE_OPTIONS = [
+		{ value: "", label: "Все языки" },
+		{ value: "ru", label: "Русский" },
+		{ value: "en", label: "Английский" },
+		{ value: "auto", label: "Не определен" },
+	];
 
 	let objects = $state<KnowledgeObject[]>([]);
 	let paginationMeta = $state<PaginationMeta>({ page: 1, pageSize: PAGE_SIZE, total: 0, totalPages: 1 });
@@ -67,10 +75,11 @@
 	let appliedQuery = $state("");
 	let typeFilter = $state("");
 	let statusFilter = $state<"" | KnowledgeObjectStatus>("");
+	let languageFilter = $state("");
 	let queryDebounceTimeout: number | null = null;
 	let hasHydratedFromUrl = false;
 
-	const hasActiveFilters = $derived(Boolean(appliedQuery || typeFilter || statusFilter));
+	const hasActiveFilters = $derived(Boolean(appliedQuery || typeFilter || statusFilter || languageFilter));
 
 	function clearDeleteConfirmation(): void {
 		if (deleteConfirmTimeout !== null) {
@@ -140,10 +149,12 @@
 			query: string;
 			type: string;
 			status: "" | KnowledgeObjectStatus;
+			language: string;
 		} = {
 			query: appliedQuery,
 			type: typeFilter,
 			status: statusFilter,
+			language: languageFilter,
 		},
 	): Promise<void> {
 		const currentRun = ++requestRun;
@@ -157,6 +168,7 @@
 				query: filters.query || undefined,
 				type: filters.type || undefined,
 				status: filters.status || undefined,
+				language: filters.language || undefined,
 			});
 			if (currentRun !== requestRun) {
 				return;
@@ -192,6 +204,11 @@
 		resetToFirstPage();
 	}
 
+	function handleLanguageFilterChange(value: string): void {
+		languageFilter = value;
+		resetToFirstPage();
+	}
+
 	function handleStatusFilterChange(value: "" | KnowledgeObjectStatus): void {
 		statusFilter = value;
 		resetToFirstPage();
@@ -214,6 +231,7 @@
 				query: nextQuery,
 				type: typeFilter,
 				status: statusFilter,
+				language: languageFilter,
 			});
 		}
 	}
@@ -236,6 +254,7 @@
 		const nextQuery = searchParams.get("query")?.trim() ?? "";
 		const nextType = searchParams.get("type")?.trim() ?? "";
 		const nextStatus = getStatusFromSearchParams(searchParams);
+		const nextLanguage = searchParams.get("language")?.trim() ?? "";
 		const nextPage = getPageFromSearchParams(searchParams);
 
 		// Depend only on the URL here. Reading local filters would rerun this
@@ -244,6 +263,7 @@
 		appliedQuery = nextQuery;
 		typeFilter = nextType;
 		statusFilter = nextStatus;
+		languageFilter = nextLanguage;
 		currentPage = nextPage;
 		pagination = { pageIndex: nextPage - 1, pageSize: PAGE_SIZE };
 
@@ -282,6 +302,7 @@
 			query: appliedQuery || undefined,
 			type: typeFilter || undefined,
 			status: statusFilter || undefined,
+			language: languageFilter || undefined,
 		});
 		const nextSearch = searchParams.toString();
 		const currentSearch = page.url.searchParams.toString();
@@ -290,7 +311,11 @@
 			return;
 		}
 
-		void goto(`${page.url.pathname}${nextSearch ? `?${nextSearch}` : ""}`, {
+		const target = resolve("/data") + (nextSearch ? "?" + nextSearch : "");
+
+		// target is based on resolve("/data"); the query string is appended separately.
+		// eslint-disable-next-line svelte/no-navigation-without-resolve
+		void goto(target, {
 			replaceState: true,
 			noScroll: true,
 			keepFocus: true,
@@ -307,8 +332,9 @@
 		const query = appliedQuery;
 		const type = typeFilter;
 		const status = statusFilter;
+		const language = languageFilter;
 
-		void loadData(pageNum, { query, type, status });
+		void loadData(pageNum, { query, type, status, language });
 	});
 
 	$effect(() => {
@@ -357,6 +383,11 @@
 			accessorKey: "size",
 			header: "Размер",
 			cell: ({ row }) => renderSnippet(sizeSnippet, { size: formatBytes(row.original.size) }),
+		},
+		{
+			accessorKey: "language",
+			header: "Язык",
+			cell: ({ row }) => renderComponent(DataLanguageBadge, { language: row.original.language }),
 		},
 		{
 			accessorKey: "status",
@@ -441,6 +472,20 @@
 			</select>
 		</div>
 
+		<div class="space-y-1.5 md:w-40">
+			<label class="text-sm font-medium" for="data-language-filter">Язык</label>
+			<select
+				id="data-language-filter"
+				class="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex h-8 w-full rounded-md border px-3 py-1 text-sm focus-visible:ring-2 focus-visible:outline-none"
+				value={languageFilter}
+				onchange={(event) => handleLanguageFilterChange(event.currentTarget.value)}
+			>
+				{#each LANGUAGE_OPTIONS as option (option.value)}
+					<option value={option.value}>{option.label}</option>
+				{/each}
+			</select>
+		</div>
+
 		<div class="space-y-1.5 md:w-48">
 			<label class="text-sm font-medium" for="data-status-filter">Статус</label>
 			<select
@@ -481,7 +526,7 @@
 				{#each table.getHeaderGroups() as headerGroup (headerGroup.id)}
 					<Table.Row>
 						{#each headerGroup.headers as header (header.id)}
-							<Table.Head class={cn("has-[[role=checkbox]]:ps-3", header.column.id === "mimeType" && "hidden md:table-cell w-24", header.column.id === "filename" && "w-full min-w-0", header.column.id === "size" && "w-20", header.column.id === "status" && "w-24", header.column.id === "createdAt" && "w-36", header.column.id === "actions" && "w-36")}>
+							<Table.Head class={cn("has-[[role=checkbox]]:ps-3", header.column.id === "mimeType" && "hidden md:table-cell w-24", header.column.id === "filename" && "w-full min-w-0", header.column.id === "size" && "w-20", header.column.id === "language" && "w-20", header.column.id === "status" && "w-24", header.column.id === "createdAt" && "w-36", header.column.id === "actions" && "w-36")}>
 								{#if !header.isPlaceholder}
 									<FlexRender
 										content={header.column.columnDef.header}

@@ -374,6 +374,9 @@ func (s *InMemoryStore) ListUploads(_ context.Context, params models.ListUploads
 		if params.Status != "" && upload.Status != params.Status {
 			continue
 		}
+		if params.Language != "" && models.ResolveUploadLanguage(&upload) != strings.ToLower(params.Language) {
+			continue
+		}
 		filtered = append(filtered, upload)
 	}
 

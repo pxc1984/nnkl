@@ -19,7 +19,8 @@ type KnowledgeObjectResponse struct {
 
 type KnowledgeObject struct {
 	KnowledgeObjectResponse
-	Status string `json:"status,omitempty"`
+	Status   string `json:"status,omitempty"`
+	Language string `json:"language,omitempty"`
 }
 
 type KnowledgeObjectDetails struct {
@@ -72,6 +73,7 @@ func ToKnowledgeObjects(uploads []models.Upload) []KnowledgeObject {
 		response = append(response, KnowledgeObject{
 			KnowledgeObjectResponse: ToKnowledgeObjectResponse(&uploads[i].InputBlob),
 			Status:                  uploads[i].Status,
+			Language:                models.ResolveUploadLanguage(&uploads[i]),
 		})
 	}
 	return response

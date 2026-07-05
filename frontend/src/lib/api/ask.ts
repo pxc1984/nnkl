@@ -5,6 +5,7 @@ import { API_URL } from "$lib/config";
 export type AskRequest = {
   query: string;
   mode?: "naive" | "local" | "global" | "hybrid";
+  language?: "ru" | "en";
 };
 
 export type Reference = {
@@ -12,6 +13,7 @@ export type Reference = {
   filename: string;
   type: string;
   createdAt: string;
+  language?: string;
   number?: number;
 };
 
@@ -39,10 +41,12 @@ export function isNoContextAnswer(answer: string): boolean {
 export async function askQuestion(
   query: string,
   mode: AskRequest["mode"] = "naive",
+  language?: AskRequest["language"],
 ): Promise<AskResponse> {
   const response = await api.post<AskResponse>("/api/v1/data/ask", {
     query,
     mode,
+    language,
   });
   return response.data;
 }

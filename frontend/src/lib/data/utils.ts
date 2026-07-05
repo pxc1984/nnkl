@@ -78,6 +78,10 @@ export function buildDataSearchParams(params: DataListParams): URLSearchParams {
     searchParams.set("status", params.status.trim());
   }
 
+  if (params.language?.trim()) {
+    searchParams.set("language", params.language.trim());
+  }
+
   if (params.page && params.page > 1) {
     searchParams.set("page", String(params.page));
   }

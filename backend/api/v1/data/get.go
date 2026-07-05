@@ -36,11 +36,11 @@ func (a *DataAPI) get(c *gin.Context) {
 
 func extractKnowledgeObjectContent(upload *models.Upload) (string, string) {
 	if isMarkdownBlob(upload.OutputBlob) {
-		return string(upload.OutputBlob.Content), "markdown"
+		return string(upload.OutputBlob.Content), defaultString(upload.OutputFormat, "markdown")
 	}
 
 	if isMarkdownBlob(&upload.InputBlob) {
-		return string(upload.InputBlob.Content), "markdown"
+		return string(upload.InputBlob.Content), defaultString(upload.OutputFormat, "markdown")
 	}
 
 	return "", ""

@@ -335,14 +335,15 @@ func (s *InMemoryStore) CreateUpload(_ context.Context, params models.CreateUplo
 		uploadID = uuid.NewString()
 	}
 	upload := models.Upload{
-		ID:          uploadID,
-		InputBlobID: params.InputBlobID,
-		Status:      params.Status,
-		Language:    params.Language,
-		Error:       params.Error,
-		CreatedAt:   now,
-		UpdatedAt:   now,
-		InputBlob:   *cloneBlob(s.blobs[params.InputBlobID]),
+		ID:           uploadID,
+		InputBlobID:  params.InputBlobID,
+		Status:       params.Status,
+		OutputFormat: params.OutputFormat,
+		Language:     params.Language,
+		Error:        params.Error,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+		InputBlob:    *cloneBlob(s.blobs[params.InputBlobID]),
 	}
 	s.uploads[upload.ID] = upload
 	return cloneUpload(upload), nil
@@ -440,8 +441,15 @@ func (s *InMemoryStore) UpdateUpload(_ context.Context, id string, params models
 	if params.OutputBlobID != nil {
 		upload.OutputBlobID = params.OutputBlobID
 	}
+	if params.ClearOutputBlob {
+		upload.OutputBlobID = nil
+		upload.OutputBlob = nil
+	}
 	if params.Status != nil {
 		upload.Status = *params.Status
+	}
+	if params.OutputFormat != nil {
+		upload.OutputFormat = *params.OutputFormat
 	}
 	if params.Language != nil {
 		upload.Language = *params.Language
@@ -449,9 +457,115 @@ func (s *InMemoryStore) UpdateUpload(_ context.Context, id string, params models
 	if params.Error != nil {
 		upload.Error = params.Error
 	}
+	if params.Attempts != nil {
+		upload.Attempts = *params.Attempts
+	}
+	if params.ClaimedAt != nil {
+		upload.ClaimedAt = params.ClaimedAt
+	}
+	if params.LeaseExpiresAt != nil {
+		upload.LeaseExpiresAt = params.LeaseExpiresAt
+	}
+	if params.WorkerID != nil {
+		upload.WorkerID = params.WorkerID
+	}
+	if params.ClearClaim {
+		upload.ClaimedAt = nil
+		upload.LeaseExpiresAt = nil
+		upload.WorkerID = nil
+	}
 	upload.UpdatedAt = time.Now().UTC()
 	s.uploads[id] = upload
 	return cloneUpload(upload), nil
+}
+
+func (s *InMemoryStore) ClaimNextUploadJob(_ context.Context, workerID string, leaseDuration time.Duration) (*models.Upload, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	now := time.Now().UTC()
+	var selected *models.Upload
+	for _, upload := range s.uploads {
+		if upload.Status != "pending" {
+			continue
+		}
+		candidate := upload
+		if selected == nil || candidate.CreatedAt.Before(selected.CreatedAt) {
+			selected = &candidate
+		}
+	}
+	if selected == nil {
+		return nil, nil
+	}
+
+	claimedAt := now
+	leaseExpiresAt := now.Add(leaseDuration)
+	upload := s.uploads[selected.ID]
+	upload.Status = "processing"
+	upload.Attempts++
+	upload.ClaimedAt = &claimedAt
+	upload.LeaseExpiresAt = &leaseExpiresAt
+	upload.WorkerID = &workerID
+	emptyErr := ""
+	upload.Error = &emptyErr
+	upload.UpdatedAt = now
+	if inputBlob, ok := s.blobs[upload.InputBlobID]; ok {
+		upload.InputBlob = *cloneBlob(inputBlob)
+	}
+	if upload.OutputBlobID != nil {
+		if outputBlob, ok := s.blobs[*upload.OutputBlobID]; ok {
+			upload.OutputBlob = cloneBlob(outputBlob)
+		}
+	}
+	s.uploads[upload.ID] = upload
+	return cloneUpload(upload), nil
+}
+
+func (s *InMemoryStore) ReconcileUploadJobs(_ context.Context, now time.Time) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	now = now.UTC()
+	for id, upload := range s.uploads {
+		if inputBlob, ok := s.blobs[upload.InputBlobID]; ok {
+			upload.InputBlob = *cloneBlob(inputBlob)
+			if inputBlob.FileType == "markdown" {
+				upload.OutputBlobID = &upload.InputBlobID
+				upload.Status = "completed"
+				upload.ClaimedAt = nil
+				upload.LeaseExpiresAt = nil
+				upload.WorkerID = nil
+				emptyErr := ""
+				upload.Error = &emptyErr
+			}
+		}
+		if upload.OutputBlobID != nil {
+			if outputBlob, ok := s.blobs[*upload.OutputBlobID]; ok {
+				upload.OutputBlob = cloneBlob(outputBlob)
+				upload.Status = "completed"
+				upload.ClaimedAt = nil
+				upload.LeaseExpiresAt = nil
+				upload.WorkerID = nil
+				emptyErr := ""
+				upload.Error = &emptyErr
+			}
+		}
+		if upload.OutputBlobID == nil && upload.Status == "processing" && (upload.LeaseExpiresAt == nil || !upload.LeaseExpiresAt.After(now)) {
+			upload.Status = "pending"
+			upload.ClaimedAt = nil
+			upload.LeaseExpiresAt = nil
+			upload.WorkerID = nil
+		}
+		if upload.OutputBlobID == nil && upload.Status == "completed" {
+			upload.Status = "pending"
+			upload.ClaimedAt = nil
+			upload.LeaseExpiresAt = nil
+			upload.WorkerID = nil
+		}
+		upload.UpdatedAt = now
+		s.uploads[id] = upload
+	}
+	return nil
 }
 
 func (s *InMemoryStore) DeleteUploadByID(_ context.Context, id string) error {

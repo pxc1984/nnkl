@@ -36,6 +36,8 @@ type Store interface {
 	ListUploads(context.Context, models.ListUploadsParams) ([]models.Upload, int64, error)
 	GetUploadByID(context.Context, string) (*models.Upload, error)
 	UpdateUpload(context.Context, string, models.UpdateUploadParams) (*models.Upload, error)
+	ClaimNextUploadJob(context.Context, string, time.Duration) (*models.Upload, error)
+	ReconcileUploadJobs(context.Context, time.Time) error
 	DeleteUploadByID(context.Context, string) error
 	CreateAuditLog(context.Context, *models.AuditLog) error
 	CreateQuerySession(context.Context, models.CreateQuerySessionParams) (*models.QuerySession, error)

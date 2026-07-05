@@ -4,8 +4,9 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/pxc1984/nnkl-backend/api"
 	shared "github.com/pxc1984/nnkl-backend/api/v1/shared"
-	"github.com/pxc1984/nnkl-backend/worker"
+	"github.com/pxc1984/nnkl-backend/store/models"
 )
 
 func (a *DataAPI) reprocess(c *gin.Context) {
@@ -15,28 +16,32 @@ func (a *DataAPI) reprocess(c *gin.Context) {
 		return
 	}
 
-	// Enqueue for background processing instead of blocking.
-	job := worker.Job{
-		UploadID:     upload.ID,
-		OutputFormat: "markdown",
-		Language:     "auto",
-		FileType:     upload.InputBlob.FileType,
+	status := "pending"
+	emptyErr := ""
+	outputFormat := upload.OutputFormat
+	if outputFormat == "" {
+		outputFormat = "markdown"
 	}
-	switch upload.InputBlob.FileType {
-	case "docx", "pptx":
-		a.queue.EnqueueSimple(job)
-	case "pdf":
-		a.queue.EnqueueOCR(job)
-	case "markdown":
-		a.finalizeMarkdown(c, upload.ID, "auto", "markdown")
+	language := upload.Language
+	if language == "" {
+		language = "auto"
 	}
+	updated, err := a.store.UpdateUpload(c.Request.Context(), upload.ID, models.UpdateUploadParams{
+		Status:          &status,
+		OutputFormat:    &outputFormat,
+		Language:        &language,
+		Error:           &emptyErr,
+		ClearOutputBlob: true,
+		ClearClaim:      true,
+	})
+	if err != nil {
+		api.RespondError(c, http.StatusInternalServerError, "failed to requeue object", "internal_error")
+		return
+	}
+	a.queue.Notify()
 
-	status := upload.Status
-	if status == "" {
-		status = "queued"
-	}
 	c.JSON(http.StatusAccepted, shared.KnowledgeObject{
-		KnowledgeObjectResponse: shared.ToKnowledgeObjectResponse(&upload.InputBlob),
-		Status:                  status,
+		KnowledgeObjectResponse: shared.ToKnowledgeObjectResponse(&updated.InputBlob),
+		Status:                  updated.Status,
 	})
 }

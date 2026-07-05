@@ -13,6 +13,7 @@ import (
 	"github.com/pxc1984/nnkl-backend/utils"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type PostgresStore struct {
@@ -236,11 +237,12 @@ func (s *PostgresStore) GetBlobBySHA256(ctx context.Context, sha256 string) (*mo
 
 func (s *PostgresStore) CreateUpload(ctx context.Context, params models.CreateUploadParams) (*models.Upload, error) {
 	upload := &models.Upload{
-		ID:          params.ID,
-		InputBlobID: params.InputBlobID,
-		Status:      params.Status,
-		Language:    params.Language,
-		Error:       params.Error,
+		ID:           params.ID,
+		InputBlobID:  params.InputBlobID,
+		Status:       params.Status,
+		OutputFormat: params.OutputFormat,
+		Language:     params.Language,
+		Error:        params.Error,
 	}
 	if upload.ID == "" {
 		upload.ID = uuid.NewString()
@@ -298,8 +300,14 @@ func (s *PostgresStore) UpdateUpload(ctx context.Context, id string, params mode
 	if params.OutputBlobID != nil {
 		updates["output_blob"] = *params.OutputBlobID
 	}
+	if params.ClearOutputBlob {
+		updates["output_blob"] = nil
+	}
 	if params.Status != nil {
 		updates["status"] = *params.Status
+	}
+	if params.OutputFormat != nil {
+		updates["output_format"] = *params.OutputFormat
 	}
 	if params.Language != nil {
 		updates["language"] = *params.Language
@@ -307,10 +315,143 @@ func (s *PostgresStore) UpdateUpload(ctx context.Context, id string, params mode
 	if params.Error != nil {
 		updates["error"] = *params.Error
 	}
+	if params.Attempts != nil {
+		updates["attempts"] = *params.Attempts
+	}
+	if params.ClaimedAt != nil {
+		updates["claimed_at"] = *params.ClaimedAt
+	}
+	if params.LeaseExpiresAt != nil {
+		updates["lease_expires_at"] = *params.LeaseExpiresAt
+	}
+	if params.WorkerID != nil {
+		updates["worker_id"] = *params.WorkerID
+	}
+	if params.ClearClaim {
+		updates["claimed_at"] = nil
+		updates["lease_expires_at"] = nil
+		updates["worker_id"] = nil
+	}
 	if err := s.db.WithContext(ctx).Model(&models.Upload{}).Where("id = ?", id).Updates(updates).Error; err != nil {
 		return nil, err
 	}
 	return s.GetUploadByID(ctx, id)
+}
+
+func (s *PostgresStore) ClaimNextUploadJob(ctx context.Context, workerID string, leaseDuration time.Duration) (*models.Upload, error) {
+	now := time.Now().UTC()
+	leaseExpiresAt := now.Add(leaseDuration)
+
+	var claimed *models.Upload
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var upload models.Upload
+		if err := tx.
+			Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
+			Where("uploads.status = ?", "pending").
+			Order("uploads.created_at asc").
+			First(&upload).Error; err != nil {
+			return err
+		}
+
+		if err := tx.Model(&models.Upload{}).Where("id = ?", upload.ID).Updates(map[string]any{
+			"status":           "processing",
+			"attempts":         upload.Attempts + 1,
+			"claimed_at":       now,
+			"lease_expires_at": leaseExpiresAt,
+			"worker_id":        workerID,
+			"error":            "",
+		}).Error; err != nil {
+			return err
+		}
+
+		var refreshed models.Upload
+		if err := tx.Preload("InputBlob").Preload("OutputBlob").First(&refreshed, "id = ?", upload.ID).Error; err != nil {
+			return err
+		}
+		claimed = &refreshed
+		return nil
+	})
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return claimed, nil
+}
+
+func (s *PostgresStore) ReconcileUploadJobs(ctx context.Context, now time.Time) error {
+	now = now.UTC()
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Exec(`
+			UPDATE uploads
+			SET output_format = 'markdown'
+			WHERE output_format IS NULL OR output_format = ''
+		`).Error; err != nil {
+			return err
+		}
+
+		if err := tx.Exec(`
+			UPDATE uploads
+			SET attempts = 0
+			WHERE attempts IS NULL
+		`).Error; err != nil {
+			return err
+		}
+
+		if err := tx.Model(&models.Upload{}).
+			Where("output_blob IS NOT NULL").
+			Updates(map[string]any{
+				"status":           "completed",
+				"claimed_at":       nil,
+				"lease_expires_at": nil,
+				"worker_id":        nil,
+				"error":            "",
+			}).Error; err != nil {
+			return err
+		}
+
+		if err := tx.Model(&models.Upload{}).
+			Where("status = ? AND (lease_expires_at IS NULL OR lease_expires_at <= ?)", "processing", now).
+			Updates(map[string]any{
+				"status":           "pending",
+				"claimed_at":       nil,
+				"lease_expires_at": nil,
+				"worker_id":        nil,
+			}).Error; err != nil {
+			return err
+		}
+
+		if err := tx.Exec(`
+			UPDATE uploads AS u
+			SET output_blob = u.input_blob,
+			    status = 'completed',
+			    claimed_at = NULL,
+			    lease_expires_at = NULL,
+			    worker_id = NULL,
+			    error = ''
+			FROM blobs AS b
+			WHERE u.input_blob = b.id
+			  AND b.file_type = 'markdown'
+			  AND (u.output_blob IS NULL OR u.output_blob <> u.input_blob)
+		`).Error; err != nil {
+			return err
+		}
+
+		if err := tx.Exec(`
+			UPDATE uploads AS u
+			SET status = 'pending',
+			    claimed_at = NULL,
+			    lease_expires_at = NULL,
+			    worker_id = NULL
+			WHERE u.output_blob IS NULL
+			  AND u.status = 'completed'
+		`).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
 }
 
 func (s *PostgresStore) DeleteUploadByID(ctx context.Context, id string) error {

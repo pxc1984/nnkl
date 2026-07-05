@@ -3,6 +3,8 @@ package worker
 import (
 	"context"
 	"log/slog"
+	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -10,134 +12,167 @@ import (
 	"github.com/pxc1984/nnkl-backend/store/models"
 )
 
-// OCRService is the interface for calling the OCR parse endpoint.
+const (
+	defaultWorkerCount   = 2
+	defaultPollInterval  = time.Second
+	defaultLeaseDuration = 2 * time.Hour
+)
+
 type OCRService interface {
 	Parse(ctx context.Context, uploadID, inputBlobID, language string) error
 }
 
-// TextIndexer is the interface for sending extracted text to LightRAG.
 type TextIndexer interface {
 	IsConfigured() bool
 	SendText(ctx context.Context, text, fileSource string) error
 }
 
-// Job describes a document to process.
-type Job struct {
-	UploadID     string
-	OutputFormat string
-	Language     string
-	FileType     string // "docx", "pptx", or "pdf"
-}
-
-// Queue manages background processing of uploaded documents.
 type Queue struct {
 	store   store.Store
 	ocr     OCRService
 	indexer TextIndexer
 
-	simpleJobs chan Job // docx, pptx — direct text extraction
-	ocrJobs    chan Job // pdf — send to OCR service
+	workerID      string
+	workerCount   int
+	pollInterval  time.Duration
+	leaseDuration time.Duration
+	wakeCh        chan struct{}
 
 	stopCh chan struct{}
 	wg     sync.WaitGroup
 }
 
-// New creates a new processing queue. bufferSize controls the channel buffer per worker.
-func New(s store.Store, ocr OCRService, indexer TextIndexer, bufferSize int) *Queue {
+func New(s store.Store, ocr OCRService, indexer TextIndexer, wakeBuffer int) *Queue {
+	if wakeBuffer <= 0 {
+		wakeBuffer = 1
+	}
+
 	return &Queue{
-		store:      s,
-		ocr:        ocr,
-		indexer:    indexer,
-		simpleJobs: make(chan Job, bufferSize),
-		ocrJobs:    make(chan Job, bufferSize),
-		stopCh:     make(chan struct{}),
+		store:         s,
+		ocr:           ocr,
+		indexer:       indexer,
+		workerID:      buildWorkerID(),
+		workerCount:   defaultWorkerCount,
+		pollInterval:  defaultPollInterval,
+		leaseDuration: defaultLeaseDuration,
+		wakeCh:        make(chan struct{}, wakeBuffer),
+		stopCh:        make(chan struct{}),
 	}
 }
 
-// Start launches the two worker goroutines.
 func (q *Queue) Start() {
-	q.wg.Add(2)
-	go q.simpleExtractor()
-	go q.ocrProcessor()
-	slog.Info("worker queue started")
+	if err := q.store.ReconcileUploadJobs(context.Background(), time.Now().UTC()); err != nil {
+		slog.Error("upload queue reconcile failed", "error", err)
+	} else {
+		slog.Info("upload queue reconciled")
+	}
+
+	q.wg.Add(q.workerCount)
+	for workerIndex := 0; workerIndex < q.workerCount; workerIndex++ {
+		go q.workerLoop(workerIndex + 1)
+	}
+	slog.Info("worker queue started", "workers", q.workerCount, "worker_id", q.workerID)
+	q.Notify()
 }
 
-// Stop gracefully shuts down the workers, waiting for in-flight jobs to finish.
 func (q *Queue) Stop() {
 	close(q.stopCh)
 	q.wg.Wait()
 	slog.Info("worker queue stopped")
 }
 
-// EnqueueSimple enqueues a job for direct text extraction (docx, pptx).
-func (q *Queue) EnqueueSimple(job Job) {
+func (q *Queue) Notify() {
 	select {
-	case q.simpleJobs <- job:
-	case <-q.stopCh:
+	case q.wakeCh <- struct{}{}:
+	default:
 	}
 }
 
-// EnqueueOCR enqueues a job for OCR service processing (pdf).
-func (q *Queue) EnqueueOCR(job Job) {
-	select {
-	case q.ocrJobs <- job:
-	case <-q.stopCh:
-	}
-}
-
-// simpleExtractor handles docx and pptx files: extracts text directly from the
-// blob content using Go's standard library (archive/zip + encoding/xml),
-// creates an output blob with the markdown result, updates the upload, and
-// optionally sends to LightRAG.
-func (q *Queue) simpleExtractor() {
+func (q *Queue) workerLoop(workerIndex int) {
 	defer q.wg.Done()
+	ticker := time.NewTicker(q.pollInterval)
+	defer ticker.Stop()
+
 	for {
 		select {
 		case <-q.stopCh:
 			return
-		case job := <-q.simpleJobs:
-			q.processSimple(context.Background(), job)
+		case <-ticker.C:
+		case <-q.wakeCh:
+		}
+
+		for {
+			select {
+			case <-q.stopCh:
+				return
+			default:
+			}
+
+			upload, err := q.store.ClaimNextUploadJob(
+				context.Background(),
+				q.claimOwner(workerIndex),
+				q.leaseDuration,
+			)
+			if err != nil {
+				slog.Error("worker queue claim failed", "worker", workerIndex, "error", err)
+				break
+			}
+			if upload == nil {
+				break
+			}
+
+			q.processUpload(context.Background(), *upload)
 		}
 	}
 }
 
-func (q *Queue) processSimple(ctx context.Context, job Job) {
-	slog.Info("simple extraction started", "upload_id", job.UploadID, "type", job.FileType)
+func (q *Queue) processUpload(ctx context.Context, upload models.Upload) {
+	slog.Info("upload processing started", "upload_id", upload.ID, "type", upload.InputBlob.FileType)
 	start := time.Now()
 
-	upload, err := q.store.GetUploadByID(ctx, job.UploadID)
-	if err != nil {
-		slog.Error("simple extraction: failed to get upload", "upload_id", job.UploadID, "error", err)
-		return
+	switch upload.InputBlob.FileType {
+	case "docx", "pptx":
+		q.processSimple(ctx, upload)
+	case "pdf":
+		q.processOCR(ctx, upload)
+	case "markdown":
+		q.processMarkdown(ctx, upload)
+	default:
+		q.failUpload(ctx, upload.ID, "unsupported file type: "+upload.InputBlob.FileType)
 	}
 
-	// Mark as processing.
-	status := "processing"
-	if _, err := q.store.UpdateUpload(ctx, upload.ID, models.UpdateUploadParams{Status: &status}); err != nil {
-		slog.Error("simple extraction: failed to set processing status", "upload_id", job.UploadID, "error", err)
-		return
+	slog.Info("upload processing finished", "upload_id", upload.ID, "type", upload.InputBlob.FileType, "duration", time.Since(start))
+}
+
+func (q *Queue) processMarkdown(ctx context.Context, upload models.Upload) {
+	outputBlobID := upload.InputBlobID
+	completed := "completed"
+	emptyErr := ""
+	if _, err := q.store.UpdateUpload(ctx, upload.ID, models.UpdateUploadParams{
+		OutputBlobID: &outputBlobID,
+		Status:       &completed,
+		Error:        &emptyErr,
+		ClearClaim:   true,
+	}); err != nil {
+		slog.Error("markdown finalize failed", "upload_id", upload.ID, "error", err)
 	}
 
-	// Extract text from the input blob content.
-	markdown, err := extractText(upload.InputBlob.Content, job.FileType)
-	if err != nil {
-		errMsg := err.Error()
-		failed := "failed"
-		if _, uErr := q.store.UpdateUpload(ctx, upload.ID, models.UpdateUploadParams{
-			Status: &failed,
-			Error:  &errMsg,
-		}); uErr != nil {
-			slog.Error("simple extraction: failed to set failed status", "upload_id", job.UploadID, "error", uErr)
+	if q.indexer != nil && q.indexer.IsConfigured() {
+		source := upload.ID + ".md"
+		if err := q.indexer.SendText(ctx, string(upload.InputBlob.Content), source); err != nil {
+			slog.Warn("markdown processing: lightrag send failed", "upload_id", upload.ID, "error", err)
 		}
-		slog.Error("simple extraction failed", "upload_id", job.UploadID, "error", err)
+	}
+}
+
+func (q *Queue) processSimple(ctx context.Context, upload models.Upload) {
+	markdown, err := extractText(upload.InputBlob.Content, upload.InputBlob.FileType)
+	if err != nil {
+		q.failUpload(ctx, upload.ID, err.Error())
 		return
 	}
 
-	// Wrap with source comment — matches OCR service convention.
-	source := job.UploadID + ".md"
 	output := "<!-- source: " + upload.InputBlob.Filename + " -->\n\n" + markdown
-
-	// Create output blob.
 	outBlob, err := q.store.CreateBlob(ctx, models.CreateBlobParams{
 		Filename:    upload.InputBlob.Filename + ".md",
 		FileType:    "markdown",
@@ -146,102 +181,86 @@ func (q *Queue) processSimple(ctx context.Context, job Job) {
 		Content:     []byte(output),
 	})
 	if err != nil {
-		errMsg := "failed to create output blob: " + err.Error()
-		failed := "failed"
-		if _, uErr := q.store.UpdateUpload(ctx, upload.ID, models.UpdateUploadParams{
-			Status: &failed,
-			Error:  &errMsg,
-		}); uErr != nil {
-			slog.Error("simple extraction: failed to set failed status", "upload_id", job.UploadID, "error", uErr)
-		}
-		slog.Error("simple extraction: create output blob failed", "upload_id", job.UploadID, "error", err)
+		q.failUpload(ctx, upload.ID, "failed to create output blob: "+err.Error())
 		return
 	}
 
-	// Update upload as completed with output blob.
 	completed := "completed"
 	emptyErr := ""
 	if _, err := q.store.UpdateUpload(ctx, upload.ID, models.UpdateUploadParams{
 		OutputBlobID: &outBlob.ID,
 		Status:       &completed,
-		Language:     &job.Language,
+		Language:     &upload.Language,
 		Error:        &emptyErr,
+		ClearClaim:   true,
 	}); err != nil {
-		slog.Error("simple extraction: failed to finalize upload", "upload_id", job.UploadID, "error", err)
+		slog.Error("simple extraction finalize failed", "upload_id", upload.ID, "error", err)
 		return
 	}
 
-	slog.Info("simple extraction completed", "upload_id", job.UploadID,
-		"type", job.FileType, "duration", time.Since(start))
-
-	// Send to LightRAG if configured.
 	if q.indexer != nil && q.indexer.IsConfigured() {
+		source := upload.ID + ".md"
 		if err := q.indexer.SendText(ctx, output, source); err != nil {
-			slog.Warn("simple extraction: lightrag send failed", "upload_id", job.UploadID, "error", err)
+			slog.Warn("simple extraction: lightrag send failed", "upload_id", upload.ID, "error", err)
 		}
 	}
 }
 
-// ocrProcessor handles pdf files: delegates to the OCR service via HTTP.
-func (q *Queue) ocrProcessor() {
-	defer q.wg.Done()
-	for {
-		select {
-		case <-q.stopCh:
-			return
-		case job := <-q.ocrJobs:
-			q.processOCR(context.Background(), job)
-		}
+func (q *Queue) processOCR(ctx context.Context, upload models.Upload) {
+	if err := q.ocr.Parse(ctx, upload.ID, upload.InputBlobID, upload.Language); err != nil {
+		q.failUpload(ctx, upload.ID, "ocr parse failed: "+err.Error())
+		return
 	}
-}
 
-func (q *Queue) processOCR(ctx context.Context, job Job) {
-	slog.Info("ocr processing started", "upload_id", job.UploadID)
-	start := time.Now()
-
-	upload, err := q.store.GetUploadByID(ctx, job.UploadID)
+	updated, err := q.store.GetUploadByID(ctx, upload.ID)
 	if err != nil {
-		slog.Error("ocr processing: failed to get upload", "upload_id", job.UploadID, "error", err)
+		slog.Error("ocr processing: failed to reload upload", "upload_id", upload.ID, "error", err)
 		return
 	}
 
-	// Mark as processing.
-	status := "processing"
-	if _, err := q.store.UpdateUpload(ctx, upload.ID, models.UpdateUploadParams{Status: &status}); err != nil {
-		slog.Error("ocr processing: failed to set processing status", "upload_id", job.UploadID, "error", err)
+	completed := "completed"
+	emptyErr := ""
+	if updated.OutputBlobID != nil {
+		if _, err := q.store.UpdateUpload(ctx, upload.ID, models.UpdateUploadParams{
+			Status:     &completed,
+			Error:      &emptyErr,
+			ClearClaim: true,
+		}); err != nil {
+			slog.Error("ocr processing: failed to clear claim", "upload_id", upload.ID, "error", err)
+		}
+	} else {
+		q.failUpload(ctx, upload.ID, "ocr parse finished without output blob")
 		return
 	}
 
-	// Call OCR service. It reads the input blob and updates the upload directly in the DB.
-	if err := q.ocr.Parse(ctx, upload.ID, upload.InputBlobID, job.Language); err != nil {
-		errMsg := "ocr parse failed: " + err.Error()
-		failed := "failed"
-		if _, uErr := q.store.UpdateUpload(ctx, upload.ID, models.UpdateUploadParams{
-			Status: &failed,
-			Error:  &errMsg,
-		}); uErr != nil {
-			slog.Error("ocr processing: failed to set failed status", "upload_id", job.UploadID, "error", uErr)
-		}
-		slog.Error("ocr processing failed", "upload_id", job.UploadID, "error", err)
-		return
-	}
-
-	slog.Info("ocr processing completed", "upload_id", job.UploadID,
-		"duration", time.Since(start))
-
-	// Optionally send to LightRAG after OCR is done.
-	if q.indexer != nil && q.indexer.IsConfigured() {
-		// Re-fetch to get the output blob set by the OCR service.
-		updated, err := q.store.GetUploadByID(ctx, job.UploadID)
-		if err != nil {
-			slog.Warn("ocr processing: failed to re-fetch upload for lightrag", "upload_id", job.UploadID, "error", err)
-			return
-		}
-		if updated.OutputBlob != nil && len(updated.OutputBlob.Content) > 0 {
-			source := job.UploadID + ".md"
-			if err := q.indexer.SendText(ctx, string(updated.OutputBlob.Content), source); err != nil {
-				slog.Warn("ocr processing: lightrag send failed", "upload_id", job.UploadID, "error", err)
-			}
+	if q.indexer != nil && q.indexer.IsConfigured() && updated.OutputBlob != nil && len(updated.OutputBlob.Content) > 0 {
+		source := upload.ID + ".md"
+		if err := q.indexer.SendText(ctx, string(updated.OutputBlob.Content), source); err != nil {
+			slog.Warn("ocr processing: lightrag send failed", "upload_id", upload.ID, "error", err)
 		}
 	}
+}
+
+func (q *Queue) failUpload(ctx context.Context, uploadID, errorMessage string) {
+	failed := "failed"
+	if _, err := q.store.UpdateUpload(ctx, uploadID, models.UpdateUploadParams{
+		Status:     &failed,
+		Error:      &errorMessage,
+		ClearClaim: true,
+	}); err != nil {
+		slog.Error("failed to update failed upload", "upload_id", uploadID, "error", err)
+	}
+	slog.Error("upload processing failed", "upload_id", uploadID, "error", errorMessage)
+}
+
+func (q *Queue) claimOwner(workerIndex int) string {
+	return q.workerID + ":" + strconv.Itoa(workerIndex)
+}
+
+func buildWorkerID() string {
+	hostname, err := os.Hostname()
+	if err != nil || hostname == "" {
+		hostname = "backend"
+	}
+	return hostname + ":" + strconv.Itoa(os.Getpid())
 }

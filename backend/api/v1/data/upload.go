@@ -8,7 +8,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/pxc1984/nnkl-backend/api"
 	"github.com/pxc1984/nnkl-backend/store/models"
-	"github.com/pxc1984/nnkl-backend/worker"
 	"gorm.io/gorm"
 )
 
@@ -49,10 +48,11 @@ func (a *DataAPI) upload(c *gin.Context) {
 		}
 
 		upload, err := a.store.CreateUpload(c.Request.Context(), models.CreateUploadParams{
-			ID:          blob.ID,
-			InputBlobID: blob.ID,
-			Status:      "pending",
-			Language:    defaultString(params.Language, "auto"),
+			ID:           blob.ID,
+			InputBlobID:  blob.ID,
+			Status:       "pending",
+			OutputFormat: defaultString(params.OutputFormat, "markdown"),
+			Language:     defaultString(params.Language, "auto"),
 		})
 		if err != nil {
 			if err == gorm.ErrDuplicatedKey {
@@ -63,22 +63,7 @@ func (a *DataAPI) upload(c *gin.Context) {
 			return
 		}
 
-		// Enqueue for background processing instead of blocking on OCR/extraction.
-		job := worker.Job{
-			UploadID:     upload.ID,
-			OutputFormat: defaultString(params.OutputFormat, "markdown"),
-			Language:     defaultString(params.Language, "auto"),
-			FileType:     blob.FileType,
-		}
-		switch blob.FileType {
-		case "docx", "pptx":
-			a.queue.EnqueueSimple(job)
-		case "pdf":
-			a.queue.EnqueueOCR(job)
-		case "markdown":
-			// Markdown is already text — finalize inline so the response is immediate.
-			a.finalizeMarkdown(c, upload.ID, job.Language, job.OutputFormat)
-		}
+		a.queue.Notify()
 
 		response.Items = append(response.Items, DataUploadItem{
 			ID:       upload.ID,

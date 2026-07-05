@@ -7,7 +7,6 @@ import (
 	"github.com/pxc1984/nnkl-backend/api"
 	shared "github.com/pxc1984/nnkl-backend/api/v1/shared"
 	"github.com/pxc1984/nnkl-backend/store/models"
-	"github.com/pxc1984/nnkl-backend/worker"
 )
 
 func (a *DataAPI) update(c *gin.Context) {
@@ -69,36 +68,25 @@ func (a *DataAPI) update(c *gin.Context) {
 			inputBlobID := blob.ID
 			language := defaultString(params.Language, current.Language)
 			status := "pending"
-			var outputBlobID *string
-			if isMarkdownBlob(blob) {
-				status = "completed"
-				outputBlobID = &inputBlobID
+			outputFormat := defaultString(params.OutputFormat, current.OutputFormat)
+			if outputFormat == "" {
+				outputFormat = "markdown"
 			}
+			emptyErr := ""
 			upload, err := a.store.UpdateUpload(c.Request.Context(), current.ID, models.UpdateUploadParams{
-				InputBlobID:  &inputBlobID,
-				OutputBlobID: outputBlobID,
-				Status:       &status,
-				Language:     &language,
-				Error:        stringPtr(""),
+				InputBlobID:     &inputBlobID,
+				ClearOutputBlob: true,
+				Status:          &status,
+				OutputFormat:    &outputFormat,
+				Language:        &language,
+				Error:           &emptyErr,
+				ClearClaim:      true,
 			})
 			if err != nil {
 				api.RespondError(c, http.StatusInternalServerError, "failed to update object", "internal_error")
 				return
 			}
-			if !isMarkdownBlob(blob) {
-				job := worker.Job{
-					UploadID:     upload.ID,
-					OutputFormat: defaultString(params.OutputFormat, "markdown"),
-					Language:     language,
-					FileType:     blob.FileType,
-				}
-				switch blob.FileType {
-				case "docx", "pptx":
-					a.queue.EnqueueSimple(job)
-				case "pdf":
-					a.queue.EnqueueOCR(job)
-				}
-			}
+			a.queue.Notify()
 			c.JSON(http.StatusOK, shared.KnowledgeObject{
 				KnowledgeObjectResponse: shared.ToKnowledgeObjectResponse(&upload.InputBlob),
 				Status:                  upload.Status,

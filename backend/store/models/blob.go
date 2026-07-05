@@ -24,16 +24,21 @@ func (Blob) TableName() string {
 }
 
 type Upload struct {
-	ID           string    `gorm:"type:uuid;primaryKey" json:"id"`
-	InputBlobID  string    `gorm:"column:input_blob;type:uuid;index" json:"inputBlobId"`
-	OutputBlobID *string   `gorm:"column:output_blob;type:uuid;index" json:"outputBlobId,omitempty"`
-	Status       string    `json:"status"`
-	Language     string    `json:"language"`
-	Error        *string   `json:"error,omitempty"`
-	CreatedAt    time.Time `json:"createdAt"`
-	UpdatedAt    time.Time `json:"updatedAt"`
-	InputBlob    Blob      `gorm:"foreignKey:InputBlobID;references:ID" json:"-"`
-	OutputBlob   *Blob     `gorm:"foreignKey:OutputBlobID;references:ID" json:"-"`
+	ID             string     `gorm:"type:uuid;primaryKey" json:"id"`
+	InputBlobID    string     `gorm:"column:input_blob;type:uuid;index" json:"inputBlobId"`
+	OutputBlobID   *string    `gorm:"column:output_blob;type:uuid;index" json:"outputBlobId,omitempty"`
+	Status         string     `json:"status"`
+	OutputFormat   string     `gorm:"column:output_format;size:32;not null;default:markdown" json:"outputFormat"`
+	Language       string     `json:"language"`
+	Error          *string    `json:"error,omitempty"`
+	Attempts       int        `gorm:"not null;default:0" json:"attempts"`
+	ClaimedAt      *time.Time `gorm:"column:claimed_at" json:"claimedAt,omitempty"`
+	LeaseExpiresAt *time.Time `gorm:"column:lease_expires_at;index" json:"leaseExpiresAt,omitempty"`
+	WorkerID       *string    `gorm:"column:worker_id;size:128" json:"workerId,omitempty"`
+	CreatedAt      time.Time  `json:"createdAt"`
+	UpdatedAt      time.Time  `json:"updatedAt"`
+	InputBlob      Blob       `gorm:"foreignKey:InputBlobID;references:ID" json:"-"`
+	OutputBlob     *Blob      `gorm:"foreignKey:OutputBlobID;references:ID" json:"-"`
 }
 
 func (Upload) TableName() string {
@@ -50,11 +55,12 @@ type CreateBlobParams struct {
 }
 
 type CreateUploadParams struct {
-	ID          string
-	InputBlobID string
-	Status      string
-	Language    string
-	Error       *string
+	ID           string
+	InputBlobID  string
+	Status       string
+	OutputFormat string
+	Language     string
+	Error        *string
 }
 
 type ListUploadsParams struct {
@@ -66,9 +72,16 @@ type ListUploadsParams struct {
 }
 
 type UpdateUploadParams struct {
-	InputBlobID  *string
-	OutputBlobID *string
-	Status       *string
-	Language     *string
-	Error        *string
+	InputBlobID     *string
+	OutputBlobID    *string
+	ClearOutputBlob bool
+	Status          *string
+	OutputFormat    *string
+	Language        *string
+	Error           *string
+	Attempts        *int
+	ClaimedAt       *time.Time
+	LeaseExpiresAt  *time.Time
+	WorkerID        *string
+	ClearClaim      bool
 }

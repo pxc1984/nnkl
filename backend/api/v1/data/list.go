@@ -34,13 +34,8 @@ func (a *DataAPI) list(c *gin.Context) {
 		totalPages = 1
 	}
 
-	blobs := make([]models.Blob, 0, len(uploads))
-	for i := range uploads {
-		blobs = append(blobs, uploads[i].InputBlob)
-	}
-
 	c.JSON(http.StatusOK, shared.PaginatedKnowledgeObjectList{
-		Items: shared.ToKnowledgeObjectResponses(blobs),
+		Items: shared.ToKnowledgeObjects(uploads),
 		Meta: shared.PaginationMeta{
 			Page:       page,
 			PageSize:   pageSize,

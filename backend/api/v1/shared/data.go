@@ -41,8 +41,8 @@ type PaginationMeta struct {
 }
 
 type PaginatedKnowledgeObjectList struct {
-	Items []KnowledgeObjectResponse `json:"items"`
-	Meta  PaginationMeta            `json:"meta"`
+	Items []KnowledgeObject `json:"items"`
+	Meta  PaginationMeta    `json:"meta"`
 }
 
 func ToKnowledgeObjectResponse(blob *models.Blob) KnowledgeObjectResponse {
@@ -62,6 +62,17 @@ func ToKnowledgeObjectResponses(blobs []models.Blob) []KnowledgeObjectResponse {
 	response := make([]KnowledgeObjectResponse, 0, len(blobs))
 	for i := range blobs {
 		response = append(response, ToKnowledgeObjectResponse(&blobs[i]))
+	}
+	return response
+}
+
+func ToKnowledgeObjects(uploads []models.Upload) []KnowledgeObject {
+	response := make([]KnowledgeObject, 0, len(uploads))
+	for i := range uploads {
+		response = append(response, KnowledgeObject{
+			KnowledgeObjectResponse: ToKnowledgeObjectResponse(&uploads[i].InputBlob),
+			Status:                  uploads[i].Status,
+		})
 	}
 	return response
 }

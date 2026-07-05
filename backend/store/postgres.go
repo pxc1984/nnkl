@@ -345,12 +345,17 @@ func (s *PostgresStore) ClaimNextUploadJob(ctx context.Context, workerID string,
 	var claimed *models.Upload
 	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var upload models.Upload
-		if err := tx.
+		result := tx.
 			Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
 			Where("uploads.status = ?", "pending").
 			Order("uploads.created_at asc").
-			First(&upload).Error; err != nil {
-			return err
+			Limit(1).
+			Find(&upload)
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 0 {
+			return nil
 		}
 
 		if err := tx.Model(&models.Upload{}).Where("id = ?", upload.ID).Updates(map[string]any{
